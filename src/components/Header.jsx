@@ -24,7 +24,7 @@ export default function Header() {
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
         scrolled
           ? 'bg-white/95 backdrop-blur-md border-b border-border shadow-soft'
-          : 'bg-white/85 backdrop-blur'
+          : 'bg-white/85 backdrop-blur border-b border-white/20 shadow-md'
       }`}
     >
       <div className="container-x flex h-20 items-center justify-between">

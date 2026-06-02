@@ -67,10 +67,10 @@ function Hero() {
   }
 
   return (
-    <section className="relative min-h-[72vh] md:min-h-[78vh] flex items-center overflow-hidden bg-charcoal-300">
+    <section className="relative min-h-[76vh] md:min-h-[78vh] md:max-h-[820px] flex items-center overflow-hidden bg-charcoal-300">
       {/* Video Background */}
       <video
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover object-center md:object-center-[55%]"
         autoPlay
         muted
         loop
@@ -80,16 +80,24 @@ function Hero() {
         <source src="/videos/hero-rc-gameplay.mp4" type="video/mp4" />
       </video>
 
-      {/* Dark Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/68 via-black/38 to-black/12" />
+      {/* Strong Overlay Gradients */}
+      <div 
+        className="absolute inset-0 z-10"
+        style={{
+          background: `
+            linear-gradient(90deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.48) 42%, rgba(0,0,0,0.18) 100%),
+            linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.55) 100%)
+          `
+        }}
+      />
 
       {/* Content */}
-      <div className="relative z-10 container-x px-4 sm:px-6 md:px-8 py-[96px] md:py-0">
-        <div className="max-w-[760px] text-white">
+      <div className="relative z-20 px-4 sm:px-6 md:px-8 py-[96px] md:py-0">
+        <div className="max-w-[720px] md:ml-[8vw] text-white">
           <motion.span
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-widest text-orange-400"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-orange-500/50 bg-black/40 backdrop-blur-md text-xs sm:text-sm font-bold uppercase tracking-widest text-orange-400"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
             Auckland • Family Friendly • Open Daily
@@ -99,16 +107,17 @@ function Hero() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="font-display mt-4 sm:mt-5 text-[clamp(42px,13vw,64px)] leading-[0.95] font-extrabold tracking-tight"
+            className="font-display mt-4 sm:mt-5 text-[clamp(42px,13vw,64px)] leading-[0.95] font-extrabold tracking-tight text-white"
+            style={{ textShadow: '0 8px 30px rgba(0,0,0,0.55)' }}
           >
-            Drive. Dig. Build. Play.
+            Drive. Dig. <span className="text-orange-500">Build.</span> Play.
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="mt-4 sm:mt-5 text-base sm:text-lg leading-relaxed max-w-[95%] text-gray-200"
+            className="mt-4 sm:mt-5 text-base sm:text-[18px] leading-relaxed max-w-[620px] text-white/92"
           >
             New Zealand's first family-friendly RC construction arena where kids, families and groups operate real RC construction machines.
           </motion.p>
@@ -121,13 +130,13 @@ function Hero() {
           >
             <button
               onClick={() => scrollToSection('booking')}
-              className="btn-primary w-full justify-center"
+              className="h-[52px] rounded-full bg-orange-500 text-white font-bold text-base px-6 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-shadow"
             >
               Book Your Session
             </button>
             <button
               onClick={() => scrollToSection('videos')}
-              className="btn-outline w-full justify-center bg-white/10 border-white/30 text-white hover:bg-white/20"
+              className="h-[52px] rounded-full bg-black/40 backdrop-blur-md border border-white/35 text-white font-semibold text-base px-6 hover:bg-black/50 transition-colors"
             >
               Watch The Experience
             </button>
@@ -145,7 +154,7 @@ function Hero() {
               { icon: Cake, label: 'Birthday Friendly' },
               { icon: Users, label: 'Family Friendly' }
             ].map((item, i) => (
-              <div key={i} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-sm text-white">
+              <div key={i} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/18 text-sm text-white">
                 <item.icon size={14} className="text-orange-400" />
                 <span className="text-xs sm:text-sm">{item.label}</span>
               </div>
