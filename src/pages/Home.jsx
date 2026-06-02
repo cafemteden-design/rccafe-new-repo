@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import SectionHeading from '../components/SectionHeading.jsx'
 import MachineCard from '../components/MachineCard.jsx'
+import VideoRail from '../components/VideoRail.jsx'
 import { MACHINES } from '../data/machines.js'
 import { PRICING, SITE } from '../data/site.js'
 import { GALLERY } from '../data/gallery.js'
@@ -40,6 +41,7 @@ export default function Home() {
     <>
       <Hero />
       <HighlightsBar />
+      <VideoRail />
       <AboutExperience />
       <MachinesSection />
       <PricingSection />

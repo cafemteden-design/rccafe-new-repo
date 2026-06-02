@@ -28,12 +28,8 @@ export default function Header() {
       }`}
     >
       <div className="container-x flex h-20 items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 group">
-          <Logo className="h-12 w-auto transition-transform group-hover:scale-105" />
-          <div className="hidden sm:block leading-none">
-            <div className="font-display text-lg font-extrabold tracking-tight text-charcoal-300">RC Cafe</div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-orange-600 font-bold">Remote Control Arena</div>
-          </div>
+        <Link to="/" className="flex items-center group" aria-label="RC Cafe — Home">
+          <Logo className="h-[52px] sm:h-[64px] w-auto transition-transform group-hover:scale-[1.03]" />
         </Link>
 
         <nav className="hidden lg:flex items-center gap-1">
