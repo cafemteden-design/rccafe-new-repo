@@ -42,7 +42,9 @@ export default function Home() {
     <>
       <Hero />
       <HighlightsBar />
-      <VideoRail />
+      <div id="videos">
+        <VideoRail />
+      </div>
       <AboutExperience />
       <MachinesSection />
       <PricingSection />
@@ -57,113 +59,99 @@ export default function Home() {
 
 /* ---------------------------------- Hero --------------------------------- */
 function Hero() {
-  return (
-    <section className="relative overflow-hidden bg-white">
-      {/* soft background accents */}
-      <div className="pointer-events-none absolute -top-32 -right-32 h-[420px] w-[420px] rounded-full bg-orange-100 blur-3xl opacity-70" />
-      <div className="pointer-events-none absolute -bottom-40 -left-32 h-[420px] w-[420px] rounded-full bg-orange-50 blur-3xl" />
+  const scrollToSection = (id) => {
+    const element = document.getElementById(id)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
-      <div className="container-x grid lg:grid-cols-12 gap-8 sm:gap-10 items-center py-12 sm:py-16 lg:py-24">
-        <div className="lg:col-span-6">
+  return (
+    <section className="relative min-h-[72vh] md:min-h-[78vh] flex items-center overflow-hidden bg-charcoal-300">
+      {/* Video Background */}
+      <video
+        className="absolute inset-0 w-full h-full object-cover"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+      >
+        <source src="/videos/hero-rc-gameplay.mp4" type="video/mp4" />
+      </video>
+
+      {/* Dark Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/68 via-black/38 to-black/12" />
+
+      {/* Content */}
+      <div className="relative z-10 container-x px-4 sm:px-6 md:px-8 py-[96px] md:py-0">
+        <div className="max-w-[760px] text-white">
           <motion.span
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="eyebrow"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-widest text-orange-400"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-            Auckland · Family Friendly · Open Every Day
+            Auckland • Family Friendly • Open Daily
           </motion.span>
 
           <motion.h1
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="font-display mt-5 text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.02] text-charcoal-300"
+            className="font-display mt-4 sm:mt-5 text-[clamp(42px,13vw,64px)] leading-[0.95] font-extrabold tracking-tight"
           >
-            Drive. Dig. <span className="text-orange-500">Build.</span> Play.
+            Drive. Dig. Build. Play.
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="mt-5 max-w-xl text-base sm:text-lg text-muted leading-relaxed"
+            className="mt-4 sm:mt-5 text-base sm:text-lg leading-relaxed max-w-[95%] text-gray-200"
           >
-            Auckland’s hands-on remote-control construction arena where kids, families and groups can
-            operate real RC construction machines in a fun, café-style environment.
+            New Zealand's first family-friendly RC construction arena where kids, families and groups operate real RC construction machines.
           </motion.p>
 
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="mt-7 flex flex-wrap items-center gap-3"
+            className="mt-6 sm:mt-7 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"
           >
-            <Link to="/booking" className="btn-primary">
-              Book Your Session <ArrowRight size={16} />
-            </Link>
-            <Link to="/machines" className="btn-outline">
-              Explore The Arena
-            </Link>
+            <button
+              onClick={() => scrollToSection('booking')}
+              className="btn-primary w-full justify-center"
+            >
+              Book Your Session
+            </button>
+            <button
+              onClick={() => scrollToSection('videos')}
+              className="btn-outline w-full justify-center bg-white/10 border-white/30 text-white hover:bg-white/20"
+            >
+              Watch The Experience
+            </button>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.45 }}
-            className="mt-8 flex flex-wrap items-center gap-4 text-sm text-muted"
+            className="mt-6 sm:mt-8 flex flex-wrap gap-2 sm:gap-3"
           >
-            <a href={`tel:${SITE.phoneTel}`} className="inline-flex items-center gap-2 font-semibold text-charcoal-300 hover:text-orange-600">
-              <Phone size={16} className="text-orange-500" /> {SITE.phone}
-            </a>
-            <span className="hidden sm:inline text-border">•</span>
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-flex items-center text-orange-500">
-                {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill="currentColor" />)}
-              </span>
-              Loved by Auckland families
-            </span>
+            {[
+              { icon: Truck, label: 'Real RC Machines' },
+              { icon: Coffee, label: 'Cafe & Snacks' },
+              { icon: Cake, label: 'Birthday Friendly' },
+              { icon: Users, label: 'Family Friendly' }
+            ].map((item, i) => (
+              <div key={i} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-sm text-white">
+                <item.icon size={14} className="text-orange-400" />
+                <span className="text-xs sm:text-sm">{item.label}</span>
+              </div>
+            ))}
           </motion.div>
         </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="lg:col-span-6"
-        >
-          <div className="relative">
-            <div className="absolute -inset-4 rounded-[36px] bg-gradient-to-br from-orange-100 to-transparent -z-10" />
-            <div className="rounded-3xl overflow-hidden border border-border bg-white shadow-card">
-              <img src="/images/hero-arena.jpg" alt="RC construction arena with excavator and coffee" className="w-full h-[420px] sm:h-[520px] object-cover" />
-            </div>
-            {/* Floating chip card */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="hidden sm:flex absolute -left-4 bottom-8 items-center gap-3 bg-white border border-border rounded-2xl px-4 py-3 shadow-card"
-            >
-              <div className="grid place-items-center w-10 h-10 rounded-xl bg-orange-100 text-orange-600"><Truck size={20} /></div>
-              <div>
-                <div className="text-xs uppercase tracking-widest text-muted font-bold">From</div>
-                <div className="font-display text-lg font-extrabold text-charcoal-300">$10 / session</div>
-              </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.75 }}
-              className="hidden sm:flex absolute -right-4 top-8 items-center gap-3 bg-white border border-border rounded-2xl px-4 py-3 shadow-card"
-            >
-              <div className="grid place-items-center w-10 h-10 rounded-xl bg-orange-100 text-orange-600"><Coffee size={20} /></div>
-              <div>
-                <div className="text-xs uppercase tracking-widest text-muted font-bold">Cafe</div>
-                <div className="font-display text-lg font-extrabold text-charcoal-300">Drinks & Snacks</div>
-              </div>
-            </motion.div>
-          </div>
-        </motion.div>
       </div>
     </section>
   )
@@ -443,7 +431,7 @@ function FAQSection() {
 /* ------------------------------- Final CTA ------------------------------ */
 function FinalCTA() {
   return (
-    <section className="relative section-light py-14 sm:py-20 overflow-hidden">
+    <section id="booking" className="relative section-light py-14 sm:py-20 overflow-hidden">
       <div className="container-x">
         <div className="relative rounded-3xl border border-border bg-bg-soft p-10 lg:p-14 overflow-hidden">
           <div className="pointer-events-none absolute -top-20 -right-20 h-72 w-72 rounded-full bg-orange-200/60 blur-3xl" />
