@@ -8,6 +8,7 @@ import {
 import SectionHeading from '../components/SectionHeading.jsx'
 import MachineCard from '../components/MachineCard.jsx'
 import VideoRail from '../components/VideoRail.jsx'
+import ArenaMoments from '../components/ArenaMoments.jsx'
 import { MACHINES } from '../data/machines.js'
 import { PRICING, SITE } from '../data/site.js'
 import { GALLERY } from '../data/gallery.js'
@@ -46,6 +47,7 @@ export default function Home() {
       <MachinesSection />
       <PricingSection />
       <GalleryPreview />
+      <ArenaMoments />
       <GroupsSection />
       <FAQSection />
       <FinalCTA />
