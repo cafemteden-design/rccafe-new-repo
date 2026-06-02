@@ -162,6 +162,7 @@ function VideoCard({ video, featured = false }) {
         muted
         loop
         playsInline
+        webkit-playsinline
         preload="metadata"
         className="absolute inset-0 h-full w-full object-cover"
       />

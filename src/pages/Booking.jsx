@@ -359,11 +359,11 @@ function SidebarLine({ label, value }) {
 function SuccessCard({ data, bookingId, onReset }) {
   const slotTime = getSlotTime(data.slotIndex)
   return (
-    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto text-center card p-10">
-      <CheckCircle2 size={64} className="text-orange-500 mx-auto" />
-      <h2 className="font-display text-3xl font-extrabold mt-4 text-charcoal-300">Booking Request Received!</h2>
-      <p className="mt-3 text-muted">Thank you{data.name ? `, ${data.name}` : ''}! Your booking request has been submitted. Our team will contact you shortly to confirm.</p>
-      <div className="mt-6 rounded-xl border border-border bg-bg-soft p-5 text-left text-sm space-y-2">
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto text-center card p-6 sm:p-10">
+      <CheckCircle2 size={48} sm:size={64} className="text-orange-500 mx-auto" />
+      <h2 className="font-display text-2xl sm:text-3xl font-extrabold mt-4 text-charcoal-300">Booking Request Submitted Successfully!</h2>
+      <p className="mt-3 text-muted text-sm sm:text-base">Thank you{data.name ? `, ${data.name}` : ''}! Your booking request has been submitted. Our team will contact you shortly to confirm.</p>
+      <div className="mt-6 rounded-xl border border-border bg-bg-soft p-4 sm:p-5 text-left text-sm space-y-2">
         <div className="flex justify-between"><span className="text-muted">Booking ID</span><span className="font-semibold text-charcoal-300">{bookingId}</span></div>
         <div className="flex justify-between"><span className="text-muted">Date</span><span className="font-semibold text-charcoal-300">{formatDateDisplay(data.date)}</span></div>
         <div className="flex justify-between"><span className="text-muted">Time</span><span className="font-semibold text-charcoal-300">{slotTime}</span></div>
@@ -375,7 +375,7 @@ function SuccessCard({ data, bookingId, onReset }) {
       </div>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <button onClick={onReset} className="btn-outline">Make Another Booking</button>
-        <Link to="/" className="btn-primary">Back to Home</Link>
+        <Link to="/" className="btn-primary">Return Home</Link>
       </div>
     </motion.div>
   )

@@ -148,6 +148,7 @@ function VideoCard({ item, index, onExpand }) {
             muted={muted}
             loop
             playsInline
+            webkit-playsinline
             autoPlay
             preload="metadata"
             className="absolute inset-0 h-full w-full object-cover bg-bg-soft"
