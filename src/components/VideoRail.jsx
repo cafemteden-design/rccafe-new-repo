@@ -13,17 +13,57 @@ const TRUST_CHIPS = [
 export default function VideoRail() {
   const railRef = useRef(null)
   const [lightbox, setLightbox] = useState(null) // index or null
+  const [paused, setPaused] = useState(false)
+  const pauseTimerRef = useRef(null)
 
   const scroll = (dir) => {
     const el = railRef.current
     if (!el) return
     const card = el.querySelector('[data-vcard]')
     const step = card ? card.clientWidth + 20 : 320
-    el.scrollBy({ left: dir * step, behavior: 'smooth' })
+    const max = el.scrollWidth - el.clientWidth
+    let next = el.scrollLeft + dir * step
+    // Loop back to start when we reach the end
+    if (dir > 0 && el.scrollLeft >= max - 4) next = 0
+    if (dir < 0 && el.scrollLeft <= 4) next = max
+    el.scrollTo({ left: next, behavior: 'smooth' })
   }
 
+  // Pause auto-slide briefly on user interaction
+  const nudgePause = () => {
+    setPaused(true)
+    if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current)
+    pauseTimerRef.current = setTimeout(() => setPaused(false), 4000)
+  }
+
+  // Auto-slide every 2.8s while the rail is on screen, lightbox is closed and not paused
+  useEffect(() => {
+    const el = railRef.current
+    if (!el) return
+    let inView = false
+    const io = new IntersectionObserver(([e]) => { inView = e.isIntersecting }, { threshold: 0.25 })
+    io.observe(el)
+    const id = setInterval(() => {
+      if (!inView || paused || lightbox !== null) return
+      if (document.hidden) return
+      scroll(1)
+    }, 2800)
+    // Manual swipe / drag pauses briefly
+    const onUserMove = () => nudgePause()
+    el.addEventListener('pointerdown', onUserMove)
+    el.addEventListener('wheel', onUserMove, { passive: true })
+    el.addEventListener('touchstart', onUserMove, { passive: true })
+    return () => {
+      io.disconnect()
+      clearInterval(id)
+      el.removeEventListener('pointerdown', onUserMove)
+      el.removeEventListener('wheel', onUserMove)
+      el.removeEventListener('touchstart', onUserMove)
+    }
+  }, [paused, lightbox])
+
   return (
-    <section className="section-light py-20" id="videos">
+    <section className="section-light py-14 sm:py-20" id="videos">
       <div className="container-x">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div className="max-w-2xl">
@@ -71,21 +111,21 @@ export default function VideoRail() {
 function VideoCard({ item, index, onExpand }) {
   const videoRef = useRef(null)
   const [muted, setMuted] = useState(true)
-  const [visible, setVisible] = useState(false)
+  const [shouldLoad, setShouldLoad] = useState(false)
 
   useEffect(() => {
     const el = videoRef.current
     if (!el) return
     const io = new IntersectionObserver(
       ([entry]) => {
-        setVisible(entry.isIntersecting)
         if (entry.isIntersecting) {
+          setShouldLoad(true)
           el.play().catch(() => {})
         } else {
           el.pause()
         }
       },
-      { threshold: 0.45 }
+      { threshold: 0.35, rootMargin: '200px' }
     )
     io.observe(el)
     return () => io.disconnect()
@@ -104,13 +144,13 @@ function VideoCard({ item, index, onExpand }) {
         <div className="relative aspect-[9/16] bg-bg-soft overflow-hidden">
           <video
             ref={videoRef}
-            src={item.video}
+            src={shouldLoad ? item.video : undefined}
             muted={muted}
             loop
             playsInline
             autoPlay
             preload="metadata"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover bg-bg-soft"
           />
           {/* Top badge */}
           <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500 text-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest shadow-glow">

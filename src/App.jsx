@@ -2,6 +2,7 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
+import Loader from './components/Loader.jsx'
 import Home from './pages/Home.jsx'
 import About from './pages/About.jsx'
 import Machines from './pages/Machines.jsx'
@@ -22,6 +23,7 @@ function ScrollToTop() {
 export default function App() {
   return (
     <div className="min-h-screen bg-white text-charcoal-300">
+      <Loader />
       <ScrollToTop />
       <Header />
       <main className="pt-20">

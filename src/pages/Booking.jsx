@@ -65,7 +65,7 @@ export default function Booking() {
         eyebrow="Reserve Your Slot"
         title={<>Book Your <span className="accent">Session</span></>}
         subtitle="Pick a date, choose duration, machine and time — then enter your details. All bookings follow Auckland, New Zealand local time."
-        image="/images/indoor-arena.svg"
+        image="/images/indoor-arena.jpg"
       />
 
       <section className="section-light py-12 lg:py-16">

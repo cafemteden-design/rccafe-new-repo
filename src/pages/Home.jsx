@@ -61,7 +61,7 @@ function Hero() {
       <div className="pointer-events-none absolute -top-32 -right-32 h-[420px] w-[420px] rounded-full bg-orange-100 blur-3xl opacity-70" />
       <div className="pointer-events-none absolute -bottom-40 -left-32 h-[420px] w-[420px] rounded-full bg-orange-50 blur-3xl" />
 
-      <div className="container-x grid lg:grid-cols-12 gap-10 items-center py-16 lg:py-24">
+      <div className="container-x grid lg:grid-cols-12 gap-8 sm:gap-10 items-center py-12 sm:py-16 lg:py-24">
         <div className="lg:col-span-6">
           <motion.span
             initial={{ opacity: 0, y: 10 }}
@@ -133,7 +133,7 @@ function Hero() {
           <div className="relative">
             <div className="absolute -inset-4 rounded-[36px] bg-gradient-to-br from-orange-100 to-transparent -z-10" />
             <div className="rounded-3xl overflow-hidden border border-border bg-white shadow-card">
-              <img src="/images/hero-arena.svg" alt="RC construction arena with excavator and coffee" className="w-full h-[420px] sm:h-[520px] object-cover" />
+              <img src="/images/hero-arena.jpg" alt="RC construction arena with excavator and coffee" className="w-full h-[420px] sm:h-[520px] object-cover" />
             </div>
             {/* Floating chip card */}
             <motion.div
@@ -193,7 +193,7 @@ function HighlightsBar() {
 /* ---------------------------- About experience --------------------------- */
 function AboutExperience() {
   return (
-    <section className="section-light py-20">
+    <section className="section-light py-14 sm:py-20">
       <div className="container-x grid lg:grid-cols-2 gap-12 items-center">
         <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
           <span className="eyebrow"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" />The Experience</span>
@@ -228,13 +228,13 @@ function AboutExperience() {
 
         <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="grid grid-cols-2 gap-4">
           <div className="rounded-2xl overflow-hidden border border-border bg-bg-soft">
-            <img src="/images/kids-rc-construction.svg" alt="Kid operating an RC excavator" className="w-full h-72 object-cover" />
+            <img src="/images/kids-rc-construction.jpg" alt="Kid operating an RC excavator" className="w-full h-72 object-cover" />
           </div>
           <div className="rounded-2xl overflow-hidden border border-border bg-bg-soft mt-8">
-            <img src="/images/family-cafe-activity.svg" alt="Family café activity" className="w-full h-72 object-cover" />
+            <img src="/images/family-cafe-activity.jpg" alt="Family café activity" className="w-full h-72 object-cover" />
           </div>
           <div className="rounded-2xl overflow-hidden border border-border bg-bg-soft col-span-2">
-            <img src="/images/indoor-arena.svg" alt="Indoor RC construction arena" className="w-full h-48 object-cover" />
+            <img src="/images/indoor-arena.jpg" alt="Indoor RC construction arena" className="w-full h-48 object-cover" />
           </div>
         </motion.div>
       </div>
@@ -245,14 +245,14 @@ function AboutExperience() {
 /* ----------------------------- Machines section -------------------------- */
 function MachinesSection() {
   return (
-    <section className="section-soft py-20">
+    <section className="section-soft py-14 sm:py-20">
       <div className="container-x">
         <SectionHeading
           eyebrow="The Fleet"
           title={<>Machines You Can <span className="accent">Control</span></>}
           subtitle="Choose from five different types of RC construction machines, each with its own real-world feel and mission."
         />
-        <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="mt-10 sm:mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {MACHINES.map((m, i) => <MachineCard m={m} key={m.id} index={i} />)}
         </div>
         <div className="mt-10 text-center">
@@ -266,14 +266,14 @@ function MachinesSection() {
 /* ------------------------------- Pricing --------------------------------- */
 function PricingSection() {
   return (
-    <section className="section-light py-20">
+    <section className="section-light py-14 sm:py-20">
       <div className="container-x">
         <SectionHeading
           eyebrow="Booking & Pricing"
           title={<>Simple, Family-Friendly <span className="accent">Pricing</span></>}
           subtitle="Quick rides, full sessions or bring your own RC — pick what suits you best."
         />
-        <div className="mt-12 grid md:grid-cols-3 gap-5">
+        <div className="mt-10 sm:mt-12 grid md:grid-cols-3 gap-5">
           {PRICING.map((p, i) => {
             const featured = p.id === '30min'
             return (
@@ -330,7 +330,7 @@ function PricingSection() {
 function GalleryPreview() {
   const items = GALLERY.slice(0, 6)
   return (
-    <section className="section-soft py-20">
+    <section className="section-soft py-14 sm:py-20">
       <div className="container-x">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <SectionHeading
@@ -368,14 +368,14 @@ function GalleryPreview() {
 /* ------------------------------- Groups --------------------------------- */
 function GroupsSection() {
   return (
-    <section className="section-light py-20">
+    <section className="section-light py-14 sm:py-20">
       <div className="container-x">
         <SectionHeading
           eyebrow="Groups & Parties"
           title={<>Perfect for Groups, Kids & <span className="accent">Celebrations</span></>}
           subtitle="From birthdays to school visits, we host the most exciting RC arena experiences in Auckland."
         />
-        <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="mt-10 sm:mt-12 grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {GROUPS.map((g, i) => (
             <motion.div
               key={g.title}
@@ -403,7 +403,7 @@ function GroupsSection() {
 function FAQSection() {
   const [open, setOpen] = useState(0)
   return (
-    <section className="section-soft py-20">
+    <section className="section-soft py-14 sm:py-20">
       <div className="container-x grid lg:grid-cols-12 gap-10">
         <div className="lg:col-span-5">
           <SectionHeading align="left" eyebrow="FAQ" title={<>Got <span className="accent">Questions?</span></>} subtitle="Everything you need to know before you book and play at RC Cafe Auckland." />
@@ -441,7 +441,7 @@ function FAQSection() {
 /* ------------------------------- Final CTA ------------------------------ */
 function FinalCTA() {
   return (
-    <section className="relative section-light py-20 overflow-hidden">
+    <section className="relative section-light py-14 sm:py-20 overflow-hidden">
       <div className="container-x">
         <div className="relative rounded-3xl border border-border bg-bg-soft p-10 lg:p-14 overflow-hidden">
           <div className="pointer-events-none absolute -top-20 -right-20 h-72 w-72 rounded-full bg-orange-200/60 blur-3xl" />
@@ -457,7 +457,7 @@ function FinalCTA() {
               </div>
             </div>
             <div className="rounded-2xl overflow-hidden border border-border bg-white shadow-soft">
-              <img src="/images/rc-excavator-arena.svg" alt="RC excavator arena" className="w-full h-72 object-cover" />
+              <img src="/images/rc-excavator-arena.jpg" alt="RC excavator arena" className="w-full h-72 object-cover" />
             </div>
           </div>
         </div>

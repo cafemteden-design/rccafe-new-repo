@@ -15,5 +15,15 @@ export const ARENA_VIDEOS = [
     title: 'RC Machine In Action',
     video: '/videos/rc-cafe-video-3.mp4',
     tag: 'Customer Gameplay'
+  },
+  {
+    title: 'Family RC Session',
+    video: '/videos/rc-cafe-video-4.mp4',
+    tag: 'Customer Gameplay'
+  },
+  {
+    title: 'Construction Mission',
+    video: '/videos/rc-cafe-video-5.mp4',
+    tag: 'Customer Gameplay'
   }
 ]

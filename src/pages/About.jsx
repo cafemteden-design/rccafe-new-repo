@@ -19,10 +19,10 @@ export default function About() {
         eyebrow="Our Story"
         title={<>About <span className="accent">RC Cafe</span></>}
         subtitle="Auckland’s hands-on remote-control construction arena combined with a welcoming café experience for families and groups."
-        image="/images/family-cafe-activity.svg"
+        image="/images/family-cafe-activity.jpg"
       />
 
-      <section className="section-light py-20">
+      <section className="section-light py-14 sm:py-20">
         <div className="container-x grid lg:grid-cols-2 gap-12 items-center">
           <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
             <span className="eyebrow"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" />Who We Are</span>
@@ -44,16 +44,16 @@ export default function About() {
             </div>
           </motion.div>
           <motion.div initial={{ opacity: 0, x: 16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="grid grid-cols-2 gap-4">
-            <img className="rounded-2xl border border-border h-72 w-full object-cover" src="/images/rc-excavator-arena.svg" alt="" />
-            <img className="rounded-2xl border border-border h-72 w-full object-cover mt-8" src="/images/kids-rc-construction.svg" alt="" />
+            <img className="rounded-2xl border border-border h-72 w-full object-cover" src="/images/rc-excavator-arena.jpg" alt="" />
+            <img className="rounded-2xl border border-border h-72 w-full object-cover mt-8" src="/images/kids-rc-construction.jpg" alt="" />
           </motion.div>
         </div>
       </section>
 
-      <section className="section-soft py-20">
+      <section className="section-soft py-14 sm:py-20">
         <div className="container-x">
           <SectionHeading eyebrow="What We Stand For" title={<>Our <span className="accent">Values</span></>} subtitle="Guiding principles behind every session in our arena." />
-          <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="mt-10 sm:mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {VALUES.map((v, i) => (
               <motion.div key={v.title} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }} className="card card-hover p-6">
                 <div className="grid place-items-center w-12 h-12 rounded-xl bg-orange-500 text-white">
@@ -67,7 +67,7 @@ export default function About() {
         </div>
       </section>
 
-      <section className="section-light py-20">
+      <section className="section-light py-14 sm:py-20">
         <div className="container-x text-center">
           <h2 className="heading-display">Come Build With Us</h2>
           <p className="mt-4 max-w-2xl mx-auto text-muted">Visit RC Cafe in Auckland — call <a href="tel:+6495587570" className="text-orange-600 font-bold">09 558 7570</a> to plan your group, party or first session.</p>

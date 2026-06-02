@@ -5,7 +5,7 @@ import { ChevronRight } from 'lucide-react'
 export default function PageHero({ eyebrow, title, subtitle, image, breadcrumbs = [] }) {
   return (
     <section className="relative overflow-hidden bg-bg-soft border-b border-border">
-      <div className="container-x grid lg:grid-cols-12 gap-10 py-14 lg:py-20 items-center">
+      <div className="container-x grid lg:grid-cols-12 gap-8 sm:gap-10 py-10 sm:py-14 lg:py-20 items-center">
         <div className="lg:col-span-7">
           {breadcrumbs.length > 0 && (
             <nav className="flex items-center gap-1.5 text-xs text-muted mb-4">

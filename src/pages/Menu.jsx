@@ -28,7 +28,7 @@ export default function Menu() {
         eyebrow="Café Menu"
         title={<>Fuel Up After The <span className="accent">Fun</span></>}
         subtitle="Premium coffee, fresh smoothies, indulgent bubble tea and air-fried snacks — all served while you play."
-        image="/images/family-cafe-activity.svg"
+        image="/images/family-cafe-activity.jpg"
       />
 
       <section className="section-light py-12">
@@ -74,7 +74,7 @@ export default function Menu() {
             </motion.div>
           </AnimatePresence>
 
-          <p className="mt-12 text-center text-xs text-muted">All prices in NZD. Menu may change seasonally — speak to staff for daily specials.</p>
+          <p className="mt-8 sm:mt-12 text-center text-xs text-muted">All prices in NZD. Menu may change seasonally — speak to staff for daily specials.</p>
         </div>
       </section>
     </>

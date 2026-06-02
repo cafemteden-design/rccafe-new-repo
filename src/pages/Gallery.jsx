@@ -16,7 +16,7 @@ export default function Gallery() {
         eyebrow="Inside The Arena"
         title={<>RC Cafe <span className="accent">Gallery</span></>}
         subtitle="Real moments from our arena, machines, café and group events."
-        image="/images/indoor-arena.svg"
+        image="/images/indoor-arena.jpg"
       />
 
       <section className="section-light py-12">

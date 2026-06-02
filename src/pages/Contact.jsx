@@ -25,9 +25,9 @@ export default function Contact() {
         eyebrow="Get In Touch"
         title={<>Contact <span className="accent">RC Cafe</span></>}
         subtitle="Plan a group visit, ask about machines, or organise a birthday — we’d love to hear from you."
-        image="/images/family-cafe-activity.svg"
+        image="/images/family-cafe-activity.jpg"
       />
-      <section className="section-light py-16">
+      <section className="section-light py-12 sm:py-16">
         <div className="container-x grid lg:grid-cols-5 gap-8">
           <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="lg:col-span-2 space-y-4">
             <InfoCard icon={Phone} title="Call Us" value={SITE.phone} href={`tel:${SITE.phoneTel}`} />

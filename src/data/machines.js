@@ -1,4 +1,4 @@
-// Replace SVG placeholders with real .jpg photos at /public/images/* using same filenames.
+// Real client photos at /public/images/*.jpg
 export const MACHINES = [
   {
     id: 'excavators',
@@ -7,7 +7,7 @@ export const MACHINES = [
     tag: 'Most Popular',
     description:
       'Dig, scoop and move sand like a real construction operator. Master the bucket and tracks.',
-    image: '/images/rc-excavator-arena.svg'
+    image: '/images/rc-excavator-arena.jpg'
   },
   {
     id: 'dump-trucks',
@@ -16,7 +16,7 @@ export const MACHINES = [
     tag: 'Heavy Hauler',
     description:
       'Load, transport and dump material across the arena. Team up with an excavator for full ops.',
-    image: '/images/rc-dump-truck.svg'
+    image: '/images/rc-dump-truck.jpg'
   },
   {
     id: 'cranes',
@@ -25,7 +25,7 @@ export const MACHINES = [
     tag: 'Skill Master',
     description:
       'Lift, move and complete fun construction challenges. Test your precision controls.',
-    image: '/images/rc-crane.svg'
+    image: '/images/rc-crane.jpg'
   },
   {
     id: 'loaders',
@@ -34,7 +34,7 @@ export const MACHINES = [
     tag: 'Power Player',
     description:
       'Push, carry and clear the play zone like a pro. Strong, agile and beginner friendly.',
-    image: '/images/rc-loader.svg'
+    image: '/images/rc-loader.jpg'
   },
   {
     id: 'fire-truck',
@@ -43,7 +43,7 @@ export const MACHINES = [
     tag: 'Kids Favourite',
     description:
       'A special machine experience for kids and RC lovers. Lights, sirens and fun missions.',
-    image: '/images/rc-fire-truck.svg'
+    image: '/images/rc-fire-truck.jpg'
   }
 ]
 
