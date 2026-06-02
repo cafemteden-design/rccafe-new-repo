@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <rect width="1200" height="800" fill="#f7f7f5"/>
+  <rect x="0" y="520" width="1200" height="280" fill="#f4d6a8"/>
+  <ellipse cx="400" cy="640" rx="280" ry="40" fill="#d9b078"/>
+  <ellipse cx="900" cy="700" rx="220" ry="36" fill="#d9b078"/>
+  <!-- dump truck -->
+  <g transform="translate(320 320)">
+    <!-- bed -->
+    <path d="M0 80 L380 80 L420 200 L0 200 Z" fill="#ff6b1a"/>
+    <path d="M20 80 L360 80 L380 60 L40 60 Z" fill="#d94f00"/>
+    <!-- cab -->
+    <rect x="380" y="60" width="120" height="160" rx="10" fill="#ff8941"/>
+    <rect x="400" y="80" width="80" height="70" rx="6" fill="#cfe7f5"/>
+    <!-- chassis -->
+    <rect x="0" y="200" width="500" height="36" fill="#2a2a2a"/>
+    <!-- wheels -->
+    <circle cx="80" cy="250" r="40" fill="#1f1f1f"/>
+    <circle cx="80" cy="250" r="18" fill="#666"/>
+    <circle cx="230" cy="250" r="40" fill="#1f1f1f"/>
+    <circle cx="230" cy="250" r="18" fill="#666"/>
+    <circle cx="430" cy="250" r="40" fill="#1f1f1f"/>
+    <circle cx="430" cy="250" r="18" fill="#666"/>
+  </g>
+  <text x="600" y="770" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" fill="#9b7546" opacity="0.6">rc-dump-truck.jpg — replace with real photo</text>
+</svg>

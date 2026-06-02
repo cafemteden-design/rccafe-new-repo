@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <rect width="1200" height="800" fill="#fff4ed"/>
+  <rect x="0" y="540" width="1200" height="260" fill="#f4d6a8"/>
+  <!-- crane base -->
+  <g transform="translate(430 220)">
+    <rect x="0" y="280" width="320" height="50" rx="6" fill="#2a2a2a"/>
+    <circle cx="60" cy="335" r="22" fill="#1f1f1f"/>
+    <circle cx="160" cy="335" r="22" fill="#1f1f1f"/>
+    <circle cx="260" cy="335" r="22" fill="#1f1f1f"/>
+    <rect x="80" y="200" width="160" height="80" rx="8" fill="#ff8941"/>
+    <rect x="100" y="220" width="60" height="50" rx="4" fill="#cfe7f5"/>
+    <!-- mast -->
+    <rect x="155" y="0" width="20" height="200" fill="#ff6b1a"/>
+    <!-- jib -->
+    <path d="M0 0 L370 0 L350 20 L20 20 Z" fill="#ff6b1a"/>
+    <!-- truss diagonals -->
+    <g stroke="#d94f00" stroke-width="3">
+      <line x1="20" y1="20" x2="60" y2="0"/>
+      <line x1="80" y1="20" x2="120" y2="0"/>
+      <line x1="140" y1="20" x2="180" y2="0"/>
+      <line x1="200" y1="20" x2="240" y2="0"/>
+      <line x1="260" y1="20" x2="300" y2="0"/>
+    </g>
+    <!-- hook -->
+    <line x1="40" y1="20" x2="40" y2="180" stroke="#1f1f1f" stroke-width="3"/>
+    <rect x="28" y="180" width="24" height="14" fill="#666"/>
+    <path d="M40 194 Q30 200 30 215 Q30 230 40 230 Q50 230 50 215" stroke="#1f1f1f" stroke-width="5" fill="none"/>
+  </g>
+  <text x="600" y="770" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" fill="#9b7546" opacity="0.6">rc-crane.jpg — replace with real photo</text>
+</svg>
