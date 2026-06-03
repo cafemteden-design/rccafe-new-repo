@@ -1,6 +1,4 @@
-// Paste the deployed Google Apps Script Web App URL here.
-// The endpoint should accept POST booking requests and optionally return date availability.
-export const BOOKING_API_URL = "PASTE_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE"
+export const BOOKING_API_URL = "https://script.google.com/macros/s/AKfycbz2YjonaQjCAQrE_dNoa2h-7tozAI6cGGnaGxUnrJvN_fX0O66JCNBmMwp6UYcfRar32w/exec"
 
 export const BOOKING_CONFIG = {
   operatingDays: [1, 2, 3, 4, 5],
@@ -25,14 +23,12 @@ export const BOOKING_CONFIG = {
 }
 
 export function isBookingApiConfigured() {
-  return Boolean(
-    BOOKING_API_URL &&
-    BOOKING_API_URL !== 'PASTE_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE'
-  )
+  return Boolean(BOOKING_API_URL)
 }
 
 export function generateSlotsForDate(date, availability = {}) {
   const { operatingDays, slotStartTimes, maxCapacity } = BOOKING_CONFIG
+  const availabilityBySlot = normalizeAvailability(availability)
 
   if (!date || !operatingDays.includes(date.getDay())) {
     return []
@@ -40,16 +36,16 @@ export function generateSlotsForDate(date, availability = {}) {
 
   return slotStartTimes.map((minutes, index) => {
     const time = formatTime(minutes)
-    const bookedCount = Number(availability?.[time] || 0)
-    const available = Math.max(maxCapacity - bookedCount, 0)
+    const slotAvailability = availabilityBySlot[time]
+    const available = Math.max(Number(slotAvailability?.available ?? maxCapacity), 0)
+    const status = slotAvailability?.status || getSlotStatus(available)
 
     return {
       index,
       time,
-      bookedCount,
       available,
       maxCapacity,
-      status: getSlotStatus(available)
+      status
     }
   })
 }
@@ -69,7 +65,7 @@ export async function fetchSlotAvailability(date) {
     throw new Error('Unable to load slot availability.')
   }
 
-  return response.json()
+  return parseJsonResponse(response)
 }
 
 export async function submitBooking(booking) {
@@ -82,7 +78,7 @@ export async function submitBooking(booking) {
 
   const response = await fetch(BOOKING_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { Accept: 'application/json' },
     body: JSON.stringify(booking)
   })
 
@@ -90,7 +86,48 @@ export async function submitBooking(booking) {
     throw new Error('Unable to submit booking request.')
   }
 
-  return response.json()
+  return parseJsonResponse(response)
+}
+
+async function parseJsonResponse(response) {
+  const text = await response.text()
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error('Unexpected API response.')
+  }
+}
+
+function normalizeAvailability(availability) {
+  if (Array.isArray(availability)) {
+    return availability.reduce((slots, item) => {
+      if (!item?.slot) return slots
+      const isFull = String(item.status || '').toUpperCase() === 'FULLY BOOKED'
+      const available = isFull ? 0 : Number(item.available ?? 0)
+      slots[item.slot] = {
+        available,
+        status: isFull ? 'full' : getSlotStatus(available)
+      }
+      return slots
+    }, {})
+  }
+
+  return Object.entries(availability || {}).reduce((slots, [slot, value]) => {
+    if (typeof value === 'object' && value !== null) {
+      const isFull = String(value.status || '').toUpperCase() === 'FULLY BOOKED'
+      const available = isFull ? 0 : Number(value.available ?? 0)
+      slots[slot] = {
+        available,
+        status: isFull ? 'full' : getSlotStatus(available)
+      }
+    } else {
+      const bookedCount = Number(value || 0)
+      const available = Math.max(BOOKING_CONFIG.maxCapacity - bookedCount, 0)
+      slots[slot] = { available, status: getSlotStatus(available) }
+    }
+    return slots
+  }, {})
 }
 
 function getSlotStatus(available) {

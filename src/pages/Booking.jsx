@@ -48,7 +48,7 @@ export default function Booking() {
     if (data.date) {
       setIsLoadingSlots(true)
       setErrors((current) => ({ ...current, availability: '' }))
-      setSlots(generateSlotsForDate(data.date))
+      setSlots([])
 
       fetchSlotAvailability(data.date)
         .then((availability) => {
@@ -58,8 +58,9 @@ export default function Booking() {
           if (!ignore) {
             setErrors((current) => ({
               ...current,
-              availability: 'Live availability could not be loaded. Please try again before submitting.'
+              availability: 'Unable to check availability right now. Please try again or contact us.'
             }))
+            setSlots([])
           }
         })
         .finally(() => {
@@ -81,13 +82,18 @@ export default function Booking() {
   const canNext = () => {
     switch (step) {
       case 0: return !!data.date
-      case 1: return data.slotIndex !== null && slots[data.slotIndex]?.available > 0
+      case 1: {
+        const selectedSlot = slots.find(s => s.index === data.slotIndex)
+        return selectedSlot && selectedSlot.status !== 'full' && selectedSlot.available > 0
+      }
       case 2: return data.name.trim() && data.phone.trim() && data.email.trim() && data.groupSize > 0
       default: return true
     }
   }
 
   const submit = async () => {
+    if (isSubmitting) return
+
     const validation = validateBookingData(data)
     if (!validation.isValid) {
       setErrors(validation.errors)
@@ -95,8 +101,8 @@ export default function Booking() {
     }
 
     const selectedSlot = slots.find(s => s.index === data.slotIndex)
-    if (!selectedSlot || selectedSlot.available <= 0) {
-      setErrors({ submit: 'This slot is fully booked. Please select another time.' })
+    if (!selectedSlot || selectedSlot.status === 'full' || selectedSlot.available <= 0) {
+      setErrors({ submit: 'This slot is fully booked. Please choose another available slot.' })
       return
     }
 
@@ -118,18 +124,20 @@ export default function Booking() {
       const status = result?.status || (result?.success ? 'success' : '')
 
       if (status === 'success') {
-        setSubmittedData(bookingData)
+        setSubmittedData({ ...bookingData, bookingId: result?.bookingId || '' })
         setSubmitted(true)
       } else if (status === 'slot_full') {
-        setErrors({ submit: 'This slot is fully booked. Please select another time.' })
-        setSlots(generateSlotsForDate(data.date, { [selectedSlot.time]: BOOKING_CONFIG.maxCapacity }))
+        setErrors({ submit: 'This slot is fully booked. Please choose another available slot.' })
+        setSlots((currentSlots) => currentSlots.map((slot) => (
+          slot.time === selectedSlot.time ? { ...slot, available: 0, status: 'full' } : slot
+        )))
       } else if (status === 'validation_error') {
         setErrors({ submit: result?.message || 'Please check your booking details and try again.' })
       } else {
-        setErrors({ submit: 'Booking request could not be submitted. Please try again.' })
+        setErrors({ submit: 'Unable to check availability right now. Please try again or contact us.' })
       }
     } catch (error) {
-      setErrors({ submit: error.message || 'Booking request could not be submitted. Please try again.' })
+      setErrors({ submit: 'Unable to check availability right now. Please try again or contact us.' })
     } finally {
       setIsSubmitting(false)
     }
@@ -305,7 +313,7 @@ function StepTime({ slots, slotIndex, onSelect, isLoading, error }) {
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
         {slots.map((slot) => {
           const selected = slotIndex === slot.index
-          const isFull = slot.available === 0
+          const isFull = slot.status === 'full' || slot.available === 0
           const statusColor = slot.status === 'available' ? 'bg-green-50 border-green-300 text-green-700' : slot.status === 'almost-full' ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-red-50 border-red-300 text-red-700'
           
           return (
@@ -424,9 +432,10 @@ function SuccessCard({ data, onReset }) {
       <h2 className="font-display text-2xl sm:text-3xl font-extrabold mt-4 text-charcoal-300">Booking Request Submitted Successfully!</h2>
       <p className="mt-3 text-muted text-sm sm:text-base">Thank you{data.name ? `, ${data.name}` : ''}! Your booking request has been submitted. Our team will contact you shortly to confirm.</p>
       <div className="mt-6 rounded-xl border border-border bg-bg-soft p-4 sm:p-5 text-left text-sm space-y-2">
+        <div className="flex justify-between gap-4"><span className="text-muted">Booking ID</span><span className="font-semibold text-charcoal-300 text-right">{data.bookingId || '-'}</span></div>
         <div className="flex justify-between"><span className="text-muted">Name</span><span className="font-semibold text-charcoal-300">{data.name}</span></div>
         <div className="flex justify-between"><span className="text-muted">Date</span><span className="font-semibold text-charcoal-300">{formatDateDisplay(date)}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Slot</span><span className="font-semibold text-charcoal-300">{data.slotTime}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Slot Time</span><span className="font-semibold text-charcoal-300">{data.slotTime}</span></div>
         <div className="flex justify-between"><span className="text-muted">Group Size</span><span className="font-semibold text-charcoal-300">{data.groupSize}</span></div>
         <div className="flex justify-between"><span className="text-muted">Play Time</span><span className="font-semibold text-charcoal-300">{data.playTime}</span></div>
       </div>
