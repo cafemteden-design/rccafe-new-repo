@@ -27,27 +27,30 @@ export function isBookingApiConfigured() {
 }
 
 export function generateSlotsForDate(date, availability = {}) {
-  const { operatingDays, slotStartTimes, maxCapacity } = BOOKING_CONFIG
+  const { operatingDays, slotStartTimes } = BOOKING_CONFIG
   const availabilityBySlot = normalizeAvailability(availability)
 
-  if (!date || !operatingDays.includes(date.getDay())) {
+  if (!date || !operatingDays.includes(date.getDay()) || Object.keys(availabilityBySlot).length === 0) {
     return []
   }
 
-  return slotStartTimes.map((minutes, index) => {
+  return slotStartTimes.reduce((slots, minutes, index) => {
     const time = formatTime(minutes)
     const slotAvailability = availabilityBySlot[time]
-    const available = Math.max(Number(slotAvailability?.available ?? maxCapacity), 0)
-    const status = slotAvailability?.status || getSlotStatus(available)
+    if (!slotAvailability) return slots
 
-    return {
+    const available = Math.max(Number(slotAvailability.available), 0)
+
+    slots.push({
       index,
       time,
       available,
-      maxCapacity,
-      status
-    }
-  })
+      maxCapacity: BOOKING_CONFIG.maxCapacity,
+      status: slotAvailability.status
+    })
+
+    return slots
+  }, [])
 }
 
 export async function fetchSlotAvailability(date) {
@@ -101,11 +104,12 @@ async function parseJsonResponse(response) {
 
 function normalizeAvailability(availability) {
   if (Array.isArray(availability)) {
-    return availability.reduce((slots, item) => {
-      if (!item?.slot) return slots
+    return availability.reduce((slots, item, index) => {
+      const slot = normalizeSlotLabel(item?.slot, index)
+      if (!slot) return slots
       const isFull = String(item.status || '').toUpperCase() === 'FULLY BOOKED'
       const available = isFull ? 0 : Number(item.available ?? 0)
-      slots[item.slot] = {
+      slots[slot] = {
         available,
         status: isFull ? 'full' : getSlotStatus(available)
       }
@@ -128,6 +132,15 @@ function normalizeAvailability(availability) {
     }
     return slots
   }, {})
+}
+
+function normalizeSlotLabel(slot, index) {
+  if (typeof slot === 'string' && /^\d{2}:\d{2}\s[AP]M$/i.test(slot.trim())) {
+    return slot.trim().toUpperCase()
+  }
+
+  const configuredSlot = BOOKING_CONFIG.slotStartTimes[index]
+  return configuredSlot === undefined ? '' : formatTime(configuredSlot)
 }
 
 function getSlotStatus(available) {
