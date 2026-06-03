@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
-  Calendar, Clock, Users, ArrowRight, ArrowLeft, CheckCircle2, Mail, Phone, User, ChevronLeft, ChevronRight, X
+  Calendar, Clock, Users, ArrowRight, ArrowLeft, CheckCircle2, Mail, Phone, User, ChevronLeft, ChevronRight, X, Coffee
 } from 'lucide-react'
 import PageHero from '../components/PageHero.jsx'
+import { BOOKING_OPTIONS, TOASTIE_CHOICES, COFFEE_CHOICES } from '../data/menu.js'
 import {
   generateSlotsForDate,
   fetchSlotAvailability,
@@ -12,11 +13,10 @@ import {
   formatDateKey,
   formatDateDisplay,
   submitBooking,
-  validateBookingData,
-  BOOKING_CONFIG
+  validateBookingData
 } from '../data/bookingConfig.js'
 
-const STEPS = ['Select Date', 'Select Slot', 'Fill Details', 'Submit']
+const STEPS = ['Select Date', 'Select Slot', 'Select Package', 'Fill Details', 'Submit']
 
 function startOfMonth(d) { const x = new Date(d); x.setDate(1); x.setHours(0, 0, 0, 0); return x }
 function addMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth() + n); return x }
@@ -35,7 +35,10 @@ export default function Booking() {
     name: '',
     phone: '',
     email: '',
-    groupSize: 1
+    groupSize: 1,
+    packageId: '',
+    toastieChoice: '',
+    coffeeChoice: ''
   })
 
   const [availableDates] = useState(getAvailableDates())
@@ -86,7 +89,14 @@ export default function Booking() {
         const selectedSlot = slots.find(s => s.index === data.slotIndex)
         return selectedSlot && selectedSlot.status !== 'full' && selectedSlot.available > 0
       }
-      case 2: return data.name.trim() && data.phone.trim() && data.email.trim() && data.groupSize > 0
+      case 2: {
+        const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
+        if (!selectedPackage) return false
+        if (selectedPackage.includesToastie && !data.toastieChoice) return false
+        if (selectedPackage.includesCoffee && !data.coffeeChoice) return false
+        return true
+      }
+      case 3: return data.name.trim() && data.phone.trim() && data.email.trim() && data.groupSize > 0
       default: return true
     }
   }
@@ -101,8 +111,13 @@ export default function Booking() {
     }
 
     const selectedSlot = slots.find(s => s.index === data.slotIndex)
+    const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
     if (!selectedSlot || selectedSlot.status === 'full' || selectedSlot.available <= 0) {
       setErrors({ submit: 'This slot is fully booked. Please choose another available slot.' })
+      return
+    }
+    if (!selectedPackage) {
+      setErrors({ submit: 'Please select a package or play option.' })
       return
     }
 
@@ -113,7 +128,12 @@ export default function Booking() {
       groupSize: Number(data.groupSize),
       date: formatDateKey(data.date),
       slotTime: selectedSlot.time,
-      playTime: BOOKING_CONFIG.playTime
+      // Apps Script sheet columns should include the package fields below.
+      packageName: selectedPackage.name,
+      packagePrice: selectedPackage.price,
+      playTime: selectedPackage.playTime,
+      toastieChoice: selectedPackage.includesToastie ? data.toastieChoice : '',
+      coffeeChoice: selectedPackage.includesCoffee ? data.coffeeChoice : ''
     }
 
     setIsSubmitting(true)
@@ -148,7 +168,7 @@ export default function Booking() {
     setSubmittedData(null)
     setStep(0)
     setErrors({})
-    setData({ date: null, slotIndex: null, name: '', phone: '', email: '', groupSize: 1 })
+    setData({ date: null, slotIndex: null, name: '', phone: '', email: '', groupSize: 1, packageId: '', toastieChoice: '', coffeeChoice: '' })
   }
 
   return (
@@ -156,8 +176,8 @@ export default function Booking() {
       <PageHero
         breadcrumbs={['Booking']}
         eyebrow="Reserve Your Slot"
-        title={<>Book Your <span className="accent">45-Minute Session</span></>}
-        subtitle="Select a date (Mon-Fri), pick a time slot (9AM-4PM), and enter your details. Each slot accommodates up to 5 bookings."
+        title={<>Book Your <span className="accent">RC Cafe Package</span></>}
+        subtitle="Select a date, choose an available slot, pick your package, and enter your details. Each slot accommodates up to 5 bookings."
         image="/images/indoor-arena.jpg"
       />
 
@@ -167,15 +187,16 @@ export default function Booking() {
             <SuccessCard data={submittedData} onReset={reset} />
           ) : (
             <div className="grid lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-8">
+              <div className="min-w-0 lg:col-span-8">
                 <Stepper step={step} setStep={setStep} />
-                <div className="mt-6 card p-6 sm:p-8 min-h-[420px]">
+                <div className="mt-6 card min-w-0 p-6 sm:p-8 min-h-[420px]">
                   <AnimatePresence mode="wait">
                     <motion.div key={step} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.22 }}>
                       {step === 0 && <StepDate date={data.date} availableDates={availableDates} viewMonth={viewMonth} setViewMonth={setViewMonth} onSelect={(d) => update({ date: d, slotIndex: null })} error={errors.date} />}
                       {step === 1 && <StepTime slots={slots} slotIndex={data.slotIndex} onSelect={(i) => update({ slotIndex: i })} isLoading={isLoadingSlots} error={errors.slotIndex || errors.availability} />}
-                      {step === 2 && <StepDetails data={data} update={update} errors={errors} />}
-                      {step === 3 && <StepConfirm data={data} slots={slots} />}
+                      {step === 2 && <StepPackage data={data} update={update} />}
+                      {step === 3 && <StepDetails data={data} update={update} errors={errors} />}
+                      {step === 4 && <StepConfirm data={data} slots={slots} />}
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -210,7 +231,7 @@ export default function Booking() {
                 </div>
               </div>
 
-              <aside className="lg:col-span-4">
+              <aside className="min-w-0 lg:col-span-4">
                 <SummarySidebar data={data} slots={slots} />
               </aside>
             </div>
@@ -224,7 +245,7 @@ export default function Booking() {
 /* ------------------------------- Stepper -------------------------------- */
 function Stepper({ step, setStep }) {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-2">
+    <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-2">
       {STEPS.map((s, i) => {
         const active = i === step
         const done = i < step
@@ -347,6 +368,48 @@ function StepTime({ slots, slotIndex, onSelect, isLoading, error }) {
 }
 
 /* ---------------------------- Step 2: Details ---------------------------- */
+function StepPackage({ data, update }) {
+  const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
+
+  return (
+    <div>
+      <Heading title="Select Package" sub="Choose an RC + Food Garage package or upgraded play option." />
+      <div className="mt-6 grid gap-3 md:grid-cols-2">
+        {BOOKING_OPTIONS.map((item) => {
+          const selected = data.packageId === item.id
+          return (
+            <button
+              key={item.id}
+              onClick={() => update({ packageId: item.id, toastieChoice: '', coffeeChoice: '' })}
+              className={`relative rounded-xl border p-4 text-left transition ${
+                selected ? 'border-orange-500 bg-orange-50 shadow-glow' : 'border-border bg-white hover:border-orange-300'
+              }`}
+            >
+              {item.badge && <span className="absolute right-3 top-3 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">{item.badge}</span>}
+              <div className="pr-28">
+                <div className="font-display text-xl font-extrabold text-charcoal-300">{item.name}</div>
+                <div className="mt-1 text-sm font-semibold text-orange-700">{item.summary}</div>
+              </div>
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <span className="text-xs uppercase tracking-widest text-muted font-bold">{item.playTime}</span>
+                <span className="font-display text-3xl font-extrabold text-orange-600">${item.price}</span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {selectedPackage?.includesToastie && (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <ChoiceSelect label="Toastie" value={data.toastieChoice} options={TOASTIE_CHOICES} onChange={(value) => update({ toastieChoice: value })} />
+          <ChoiceSelect label="Coffee" value={data.coffeeChoice} options={COFFEE_CHOICES} onChange={(value) => update({ coffeeChoice: value })} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ---------------------------- Step 3: Details ---------------------------- */
 function StepDetails({ data, update, errors }) {
   return (
     <div>
@@ -357,21 +420,25 @@ function StepDetails({ data, update, errors }) {
         <Field label="Email Address" icon={Mail} value={data.email} onChange={(v) => update({ email: v })} type="email" required error={errors.email} className="sm:col-span-2" />
         <Field label="Group Size" icon={Users} value={data.groupSize} onChange={(v) => update({ groupSize: v.replace(/\D/g, '') || '1' })} type="number" required error={errors.groupSize} min="1" max="20" />
       </div>
-      <p className="mt-4 text-xs text-muted">All fields are required. Play time is fixed at 45 minutes.</p>
+      <p className="mt-4 text-xs text-muted">All fields are required. No machine or game selection is needed.</p>
     </div>
   )
 }
 
-/* ---------------------------- Step 3: Confirm ---------------------------- */
+/* ---------------------------- Step 4: Confirm ---------------------------- */
 function StepConfirm({ data, slots }) {
   const selectedSlot = slots.find(s => s.index === data.slotIndex)
+  const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
   return (
     <div>
       <Heading title="Confirm Booking" sub="Review your booking details before submitting." />
       <div className="mt-6 grid sm:grid-cols-2 gap-3">
         <SummaryRow icon={Calendar} label="Date" value={formatDateDisplay(data.date)} />
         <SummaryRow icon={Clock} label="Slot" value={selectedSlot?.time || '-'} />
-        <SummaryRow icon={Clock} label="Duration" value="45 Minutes" />
+        <SummaryRow icon={Coffee} label="Package" value={selectedPackage ? `${selectedPackage.name} - $${selectedPackage.price}` : '-'} />
+        <SummaryRow icon={Clock} label="Play Time" value={selectedPackage?.playTime || '-'} />
+        {selectedPackage?.includesToastie && <SummaryRow icon={Coffee} label="Toastie" value={data.toastieChoice} />}
+        {selectedPackage?.includesCoffee && <SummaryRow icon={Coffee} label="Coffee" value={data.coffeeChoice} />}
         <SummaryRow icon={Users} label="Group Size" value={data.groupSize} />
         <SummaryRow icon={User} label="Name" value={data.name} />
         <SummaryRow icon={Phone} label="Phone" value={data.phone} />
@@ -391,13 +458,17 @@ function StepConfirm({ data, slots }) {
 /* ------------------------- Sidebar / Success ----------------------------- */
 function SummarySidebar({ data, slots }) {
   const selectedSlot = slots.find(s => s.index === data.slotIndex)
+  const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
   return (
     <div className="sticky top-28 card p-6">
       <div className="text-[11px] uppercase tracking-widest text-orange-600 font-bold">Booking Summary</div>
       <div className="mt-4 space-y-3 text-sm">
         <SidebarLine label="Date" value={data.date ? formatDateDisplay(data.date) : '-'} />
         <SidebarLine label="Slot" value={selectedSlot?.time || '-'} />
-        <SidebarLine label="Duration" value="45 Minutes" />
+        <SidebarLine label="Package" value={selectedPackage?.name || '-'} />
+        <SidebarLine label="Play Time" value={selectedPackage?.playTime || '-'} />
+        {selectedPackage?.includesToastie && <SidebarLine label="Toastie" value={data.toastieChoice || '-'} />}
+        {selectedPackage?.includesCoffee && <SidebarLine label="Coffee" value={data.coffeeChoice || '-'} />}
         <SidebarLine label="Group Size" value={data.groupSize || '-'} />
       </div>
       {selectedSlot && (
@@ -436,8 +507,12 @@ function SuccessCard({ data, onReset }) {
         <div className="flex justify-between"><span className="text-muted">Name</span><span className="font-semibold text-charcoal-300">{data.name}</span></div>
         <div className="flex justify-between"><span className="text-muted">Date</span><span className="font-semibold text-charcoal-300">{formatDateDisplay(date)}</span></div>
         <div className="flex justify-between"><span className="text-muted">Slot Time</span><span className="font-semibold text-charcoal-300">{data.slotTime}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Package</span><span className="font-semibold text-charcoal-300">{data.packageName}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Price</span><span className="font-semibold text-charcoal-300">${data.packagePrice}</span></div>
         <div className="flex justify-between"><span className="text-muted">Group Size</span><span className="font-semibold text-charcoal-300">{data.groupSize}</span></div>
         <div className="flex justify-between"><span className="text-muted">Play Time</span><span className="font-semibold text-charcoal-300">{data.playTime}</span></div>
+        {data.toastieChoice && <div className="flex justify-between"><span className="text-muted">Toastie</span><span className="font-semibold text-charcoal-300">{data.toastieChoice}</span></div>}
+        {data.coffeeChoice && <div className="flex justify-between"><span className="text-muted">Coffee</span><span className="font-semibold text-charcoal-300">{data.coffeeChoice}</span></div>}
       </div>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <button onClick={onReset} className="btn-outline">Make Another Booking</button>
@@ -474,6 +549,22 @@ function Field({ label, icon: Icon, value, onChange, type = 'text', required, er
         className={`field-input ${error ? 'border-red-300 focus:border-red-500' : ''}`}
       />
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+function ChoiceSelect({ label, value, options, onChange }) {
+  return (
+    <div>
+      <label className="field-label">{label}<span className="text-orange-500">*</span></label>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="field-input"
+      >
+        <option value="">Select {label}</option>
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
     </div>
   )
 }
