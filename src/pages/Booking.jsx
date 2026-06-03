@@ -7,15 +7,16 @@ import {
 import PageHero from '../components/PageHero.jsx'
 import {
   generateSlotsForDate,
+  fetchSlotAvailability,
   getAvailableDates,
+  formatDateKey,
   formatDateDisplay,
-  getSlotTime,
-  saveBooking,
+  submitBooking,
   validateBookingData,
   BOOKING_CONFIG
 } from '../data/bookingConfig.js'
 
-const STEPS = ['Date', 'Time', 'Details', 'Confirm']
+const STEPS = ['Select Date', 'Select Slot', 'Fill Details', 'Submit']
 
 function startOfMonth(d) { const x = new Date(d); x.setDate(1); x.setHours(0, 0, 0, 0); return x }
 function addMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth() + n); return x }
@@ -24,8 +25,10 @@ function isSameDay(a, b) { return a && b && a.toDateString() === b.toDateString(
 export default function Booking() {
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
-  const [bookingId, setBookingId] = useState(null)
+  const [submittedData, setSubmittedData] = useState(null)
   const [errors, setErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [data, setData] = useState({
     date: null,
     slotIndex: null,
@@ -39,16 +42,41 @@ export default function Booking() {
   const [slots, setSlots] = useState([])
   const [viewMonth, setViewMonth] = useState(startOfMonth(new Date()))
 
-  // Generate slots when date changes
   useEffect(() => {
+    let ignore = false
+
     if (data.date) {
+      setIsLoadingSlots(true)
+      setErrors((current) => ({ ...current, availability: '' }))
       setSlots(generateSlotsForDate(data.date))
+
+      fetchSlotAvailability(data.date)
+        .then((availability) => {
+          if (!ignore) setSlots(generateSlotsForDate(data.date, availability))
+        })
+        .catch(() => {
+          if (!ignore) {
+            setErrors((current) => ({
+              ...current,
+              availability: 'Live availability could not be loaded. Please try again before submitting.'
+            }))
+          }
+        })
+        .finally(() => {
+          if (!ignore) setIsLoadingSlots(false)
+        })
     } else {
       setSlots([])
+      setIsLoadingSlots(false)
     }
+
+    return () => { ignore = true }
   }, [data.date])
 
-  const update = (patch) => setData((s) => ({ ...s, ...patch }))
+  const update = (patch) => {
+    setErrors({})
+    setData((s) => ({ ...s, ...patch }))
+  }
 
   const canNext = () => {
     switch (step) {
@@ -59,30 +87,57 @@ export default function Booking() {
     }
   }
 
-  const submit = () => {
+  const submit = async () => {
     const validation = validateBookingData(data)
     if (!validation.isValid) {
       setErrors(validation.errors)
       return
     }
 
-    const bookingData = {
-      ...data,
-      slotTime: getSlotTime(data.slotIndex)
+    const selectedSlot = slots.find(s => s.index === data.slotIndex)
+    if (!selectedSlot || selectedSlot.available <= 0) {
+      setErrors({ submit: 'This slot is fully booked. Please select another time.' })
+      return
     }
 
-    const success = saveBooking(bookingData)
-    if (success) {
-      setBookingId(bookingData.id)
-      setSubmitted(true)
-    } else {
-      setErrors({ submit: 'This slot is now fully booked. Please select another time.' })
+    const bookingData = {
+      name: data.name.trim(),
+      phone: data.phone.trim(),
+      email: data.email.trim(),
+      groupSize: Number(data.groupSize),
+      date: formatDateKey(data.date),
+      slotTime: selectedSlot.time,
+      playTime: BOOKING_CONFIG.playTime
+    }
+
+    setIsSubmitting(true)
+    setErrors({})
+
+    try {
+      const result = await submitBooking(bookingData)
+      const status = result?.status || (result?.success ? 'success' : '')
+
+      if (status === 'success') {
+        setSubmittedData(bookingData)
+        setSubmitted(true)
+      } else if (status === 'slot_full') {
+        setErrors({ submit: 'This slot is fully booked. Please select another time.' })
+        setSlots(generateSlotsForDate(data.date, { [selectedSlot.time]: BOOKING_CONFIG.maxCapacity }))
+      } else if (status === 'validation_error') {
+        setErrors({ submit: result?.message || 'Please check your booking details and try again.' })
+      } else {
+        setErrors({ submit: 'Booking request could not be submitted. Please try again.' })
+      }
+    } catch (error) {
+      setErrors({ submit: error.message || 'Booking request could not be submitted. Please try again.' })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const reset = () => {
     setSubmitted(false)
-    setBookingId(null)
+    setSubmittedData(null)
     setStep(0)
     setErrors({})
     setData({ date: null, slotIndex: null, name: '', phone: '', email: '', groupSize: 1 })
@@ -101,7 +156,7 @@ export default function Booking() {
       <section className="section-light py-12 lg:py-16">
         <div className="container-x">
           {submitted ? (
-            <SuccessCard data={data} bookingId={bookingId} onReset={reset} />
+            <SuccessCard data={submittedData} onReset={reset} />
           ) : (
             <div className="grid lg:grid-cols-12 gap-8">
               <div className="lg:col-span-8">
@@ -109,8 +164,8 @@ export default function Booking() {
                 <div className="mt-6 card p-6 sm:p-8 min-h-[420px]">
                   <AnimatePresence mode="wait">
                     <motion.div key={step} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.22 }}>
-                      {step === 0 && <StepDate date={data.date} availableDates={availableDates} viewMonth={viewMonth} setViewMonth={setViewMonth} onSelect={(d) => update({ date: d, slotIndex: null })} />}
-                      {step === 1 && <StepTime slots={slots} slotIndex={data.slotIndex} onSelect={(i) => update({ slotIndex: i })} />}
+                      {step === 0 && <StepDate date={data.date} availableDates={availableDates} viewMonth={viewMonth} setViewMonth={setViewMonth} onSelect={(d) => update({ date: d, slotIndex: null })} error={errors.date} />}
+                      {step === 1 && <StepTime slots={slots} slotIndex={data.slotIndex} onSelect={(i) => update({ slotIndex: i })} isLoading={isLoadingSlots} error={errors.slotIndex || errors.availability} />}
                       {step === 2 && <StepDetails data={data} update={update} errors={errors} />}
                       {step === 3 && <StepConfirm data={data} slots={slots} />}
                     </motion.div>
@@ -140,7 +195,9 @@ export default function Booking() {
                       Next <ArrowRight size={16} />
                     </button>
                   ) : (
-                    <button onClick={submit} className="btn-primary">Confirm Booking <CheckCircle2 size={16} /></button>
+                    <button onClick={submit} disabled={isSubmitting} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                      {isSubmitting ? 'Submitting...' : 'Submit Booking Request'} <CheckCircle2 size={16} />
+                    </button>
                   )}
                 </div>
               </div>
@@ -185,7 +242,7 @@ function Stepper({ step, setStep }) {
 }
 
 /* ------------------------------ Step 0: Date ----------------------------- */
-function StepDate({ date, availableDates, viewMonth, setViewMonth, onSelect }) {
+function StepDate({ date, availableDates, viewMonth, setViewMonth, onSelect, error }) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const monthName = viewMonth.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' })
   const firstDay = startOfMonth(viewMonth).getDay()
@@ -231,17 +288,20 @@ function StepDate({ date, availableDates, viewMonth, setViewMonth, onSelect }) {
             Selected: <span className="font-bold text-orange-700">{formatDateDisplay(date)}</span>
           </div>
         )}
-        <p className="mt-3 text-xs text-muted">Operating days: Monday – Friday only</p>
+        {error && <p className="mt-3 text-xs font-semibold text-red-600">{error}</p>}
+        <p className="mt-3 text-xs text-muted">Operating days: Monday-Friday only</p>
       </div>
     </div>
   )
 }
 
 /* ----------------------------- Step 1: Time ------------------------------ */
-function StepTime({ slots, slotIndex, onSelect }) {
+function StepTime({ slots, slotIndex, onSelect, isLoading, error }) {
   return (
     <div>
       <Heading title="Select Time Slot" sub="45-minute sessions from 9:00 AM to 4:00 PM. Each slot can accommodate up to 5 bookings." />
+      {isLoading && <p className="mt-4 text-sm font-semibold text-orange-700">Checking live availability...</p>}
+      {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
         {slots.map((slot) => {
           const selected = slotIndex === slot.index
@@ -289,7 +349,7 @@ function StepDetails({ data, update, errors }) {
         <Field label="Email Address" icon={Mail} value={data.email} onChange={(v) => update({ email: v })} type="email" required error={errors.email} className="sm:col-span-2" />
         <Field label="Group Size" icon={Users} value={data.groupSize} onChange={(v) => update({ groupSize: v.replace(/\D/g, '') || '1' })} type="number" required error={errors.groupSize} min="1" max="20" />
       </div>
-      <p className="mt-4 text-xs text-muted">All fields are required. Phone must be a valid NZ mobile number.</p>
+      <p className="mt-4 text-xs text-muted">All fields are required. Play time is fixed at 45 minutes.</p>
     </div>
   )
 }
@@ -302,7 +362,7 @@ function StepConfirm({ data, slots }) {
       <Heading title="Confirm Booking" sub="Review your booking details before submitting." />
       <div className="mt-6 grid sm:grid-cols-2 gap-3">
         <SummaryRow icon={Calendar} label="Date" value={formatDateDisplay(data.date)} />
-        <SummaryRow icon={Clock} label="Time" value={selectedSlot?.time || '—'} />
+        <SummaryRow icon={Clock} label="Slot" value={selectedSlot?.time || '-'} />
         <SummaryRow icon={Clock} label="Duration" value="45 Minutes" />
         <SummaryRow icon={Users} label="Group Size" value={data.groupSize} />
         <SummaryRow icon={User} label="Name" value={data.name} />
@@ -327,10 +387,10 @@ function SummarySidebar({ data, slots }) {
     <div className="sticky top-28 card p-6">
       <div className="text-[11px] uppercase tracking-widest text-orange-600 font-bold">Booking Summary</div>
       <div className="mt-4 space-y-3 text-sm">
-        <SidebarLine label="Date" value={data.date ? formatDateDisplay(data.date) : '—'} />
-        <SidebarLine label="Time" value={selectedSlot?.time || '—'} />
+        <SidebarLine label="Date" value={data.date ? formatDateDisplay(data.date) : '-'} />
+        <SidebarLine label="Slot" value={selectedSlot?.time || '-'} />
         <SidebarLine label="Duration" value="45 Minutes" />
-        <SidebarLine label="Group Size" value={data.groupSize || '—'} />
+        <SidebarLine label="Group Size" value={data.groupSize || '-'} />
       </div>
       {selectedSlot && (
         <div className="mt-5 rounded-xl bg-bg-soft border border-border p-4">
@@ -342,7 +402,7 @@ function SummarySidebar({ data, slots }) {
           </div>
         </div>
       )}
-      <Link to="/menu" className="btn-outline mt-4 w-full">Browse Café Menu</Link>
+      <Link to="/menu" className="btn-outline mt-4 w-full">Browse Cafe Menu</Link>
     </div>
   )
 }
@@ -356,22 +416,19 @@ function SidebarLine({ label, value }) {
   )
 }
 
-function SuccessCard({ data, bookingId, onReset }) {
-  const slotTime = getSlotTime(data.slotIndex)
+function SuccessCard({ data, onReset }) {
+  const date = data?.date ? new Date(`${data.date}T00:00:00`) : null
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto text-center card p-6 sm:p-10">
       <CheckCircle2 size={48} sm:size={64} className="text-orange-500 mx-auto" />
       <h2 className="font-display text-2xl sm:text-3xl font-extrabold mt-4 text-charcoal-300">Booking Request Submitted Successfully!</h2>
       <p className="mt-3 text-muted text-sm sm:text-base">Thank you{data.name ? `, ${data.name}` : ''}! Your booking request has been submitted. Our team will contact you shortly to confirm.</p>
       <div className="mt-6 rounded-xl border border-border bg-bg-soft p-4 sm:p-5 text-left text-sm space-y-2">
-        <div className="flex justify-between"><span className="text-muted">Booking ID</span><span className="font-semibold text-charcoal-300">{bookingId}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Date</span><span className="font-semibold text-charcoal-300">{formatDateDisplay(data.date)}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Time</span><span className="font-semibold text-charcoal-300">{slotTime}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Duration</span><span className="font-semibold text-charcoal-300">45 Minutes</span></div>
-        <div className="flex justify-between"><span className="text-muted">Group Size</span><span className="font-semibold text-charcoal-300">{data.groupSize}</span></div>
         <div className="flex justify-between"><span className="text-muted">Name</span><span className="font-semibold text-charcoal-300">{data.name}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Phone</span><span className="font-semibold text-charcoal-300">{data.phone}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Email</span><span className="font-semibold text-charcoal-300">{data.email}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Date</span><span className="font-semibold text-charcoal-300">{formatDateDisplay(date)}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Slot</span><span className="font-semibold text-charcoal-300">{data.slotTime}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Group Size</span><span className="font-semibold text-charcoal-300">{data.groupSize}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Play Time</span><span className="font-semibold text-charcoal-300">{data.playTime}</span></div>
       </div>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <button onClick={onReset} className="btn-outline">Make Another Booking</button>
@@ -420,7 +477,7 @@ function SummaryRow({ icon: Icon, label, value, className = '' }) {
       </div>
       <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-widest text-muted font-bold">{label}</div>
-        <div className="text-sm font-semibold text-charcoal-300 break-words">{value || '—'}</div>
+        <div className="text-sm font-semibold text-charcoal-300 break-words">{value || '-'}</div>
       </div>
     </div>
   )
