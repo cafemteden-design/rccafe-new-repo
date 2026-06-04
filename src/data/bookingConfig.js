@@ -239,7 +239,7 @@ export function validateBookingData(data) {
     errors.name = 'Please enter your full name'
   }
 
-  if (!data.phone || data.phone.trim().length < 6) {
+  if (!data.phone || !isValidPhone(data.phone)) {
     errors.phone = 'Please enter your phone number'
   }
 
@@ -273,6 +273,11 @@ export function validateBookingData(data) {
     isValid: Object.keys(errors).length === 0,
     errors
   }
+}
+
+function isValidPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '')
+  return digits.length >= 6 && digits.length <= 15
 }
 
 export function formatDateDisplay(date) {

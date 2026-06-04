@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useId } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
@@ -279,7 +279,7 @@ export default function Booking() {
                   ) : (
                     <button
                       onClick={submit}
-                      disabled={isSubmitting || !data.confirmAttendance}
+                      disabled={isSubmitting}
                       className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full bg-orange-500 px-7 py-4 text-base font-extrabold text-white shadow-lg shadow-orange-500/30 transition hover:bg-orange-600 hover:shadow-orange-500/45 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[230px]"
                     >
                       {isSubmitting ? 'Submitting...' : 'Reserve My Slot'} <CheckCircle2 size={18} />
@@ -682,12 +682,16 @@ function Heading({ title, sub }) {
 }
 
 function Field({ label, icon: Icon, value, onChange, type = 'text', required, error, className = '', placeholder = '', min, max }) {
+  const generatedId = useId()
+  const inputId = `booking-${generatedId}`
+
   return (
     <div className={className}>
-      <label className="field-label flex items-center gap-1.5">
+      <label htmlFor={inputId} className="field-label flex items-center gap-1.5">
         {Icon && <Icon size={12} />}{label}{required && <span className="text-orange-500">*</span>}
       </label>
       <input 
+        id={inputId}
         type={type} 
         value={value} 
         required={required} 
