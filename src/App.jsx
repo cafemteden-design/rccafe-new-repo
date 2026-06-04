@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
 import Loader from './components/Loader.jsx'
+import FloatingSocials from './components/FloatingSocials.jsx'
 import Home from './pages/Home.jsx'
 import About from './pages/About.jsx'
 import Machines from './pages/Machines.jsx'
@@ -22,11 +23,11 @@ function ScrollToTop() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-white text-charcoal-300">
+    <div className="min-h-screen overflow-x-hidden bg-white text-charcoal-300">
       <Loader />
       <ScrollToTop />
       <Header />
-      <main className="pt-20">
+      <main className="pt-24">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
+      <FloatingSocials />
       <Footer />
     </div>
   )

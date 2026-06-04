@@ -46,8 +46,3 @@ export const MACHINES = [
     image: '/images/rc-fire-truck.jpg'
   }
 ]
-
-export const MACHINE_OPTIONS_FOR_BOOKING = [
-  ...MACHINES.map((m) => ({ id: m.id, name: m.name, capacity: m.capacity })),
-  { id: 'byo', name: 'Bring Your Own', capacity: 99 }
-]

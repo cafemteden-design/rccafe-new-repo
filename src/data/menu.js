@@ -33,23 +33,22 @@ export const MENU = {
     { name: 'Iced Biscoff Latte', price: 9.0 },
     { name: 'Iced Turmeric Latte', price: 8.0 }
   ],
-  'Frappé': [
-    { name: 'Choco / Caramel', price: 9.0 },
-    { name: 'Coffee / Mocha / Matcha', price: 9.0 },
-    { name: 'Matcha Strawberry', price: 9.0 },
-    { name: 'Biscoff / Pistachio', price: 9.0 }
+  Frappe: [
+    { name: 'Choco / Caramel', price: 10.0 },
+    { name: 'Coffee / Mocha / Matcha', price: 10.0 },
+    { name: 'Matcha Strawberry', price: 10.0 },
+    { name: 'Biscoff / Pistachio', price: 10.0 }
   ],
   Smoothies: [
-    { name: 'Berry / Banana / Mango', price: 10.0 }
+    { name: 'Berry / Banana / Mango', price: 9.0 }
   ],
-  Shakes: [
+  Shake: [
     { name: 'Nutella / Oreo', price: 10.0 },
     { name: 'Biscoff / Pistachio', price: 10.0 },
     { name: 'Mango / Banana', price: 10.0 }
   ],
   Extras: [
-    { name: 'Shot / Decaf / Vanilla / Caramel / Hazelnut', price: 0.5 },
-    { name: 'Soy / Almond / Coconut / Oat Milk', price: 0.5 }
+    { name: 'Shot / Decaf / Vanilla / Caramel / Hazelnut / Soy / Almond / Coconut / Oat Milk', price: 0.5 }
   ]
 }
 
@@ -58,6 +57,7 @@ export const RC_PACKAGES = [
     id: 'mini',
     name: 'MINI',
     playTime: '30 Min Play',
+    durationMinutes: 30,
     price: 32,
     includesToastie: true,
     includesCoffee: true,
@@ -67,6 +67,7 @@ export const RC_PACKAGES = [
     id: 'power',
     name: 'POWER',
     playTime: '45 Min Play',
+    durationMinutes: 45,
     price: 45,
     badge: 'Most Popular',
     includesToastie: true,
@@ -77,6 +78,7 @@ export const RC_PACKAGES = [
     id: 'master',
     name: 'MASTER',
     playTime: '60 Min Play',
+    durationMinutes: 60,
     price: 55,
     includesToastie: true,
     includesCoffee: true,
@@ -85,24 +87,24 @@ export const RC_PACKAGES = [
 ]
 
 export const UPGRADED_PLAY = [
-  { id: 'upgrade-15', name: 'Upgraded Play 15 Min', playTime: '15 Min Play', price: 15, summary: '15 Min Play' },
-  { id: 'upgrade-30', name: 'Upgraded Play 30 Min', playTime: '30 Min Play', price: 20, summary: '30 Min Play' }
+  { id: 'upgrade-15', name: 'Upgraded Play 15 Min', playTime: '15 Min Play', durationMinutes: 15, price: 15, summary: '15 Min Play' },
+  { id: 'upgrade-30', name: 'Upgraded Play 30 Min', playTime: '30 Min Play', durationMinutes: 30, price: 20, summary: '30 Min Play' }
 ]
 
 export const BOOKING_OPTIONS = [...RC_PACKAGES, ...UPGRADED_PLAY]
 
 export const TOASTIE_CHOICES = ['Ham & Cheese', 'Cheese Only', 'Butter Toast']
 
-export const COFFEE_CHOICES = ['Any Black', 'Flat White / Latte', 'Hot Choco / Cappuccino', 'Fluffy']
+export const COFFEE_CHOICES = ['Black', 'Flat White', 'Latte', 'Cappuccino', 'Mocha', 'Hot Chocolate', 'Fluffy']
 
 export const FOOD_ITEMS = [
   { name: 'Turbo Wedges', price: 9.99 },
   { name: 'Turbo Nuggets', price: 9.99 },
   { name: 'Wedges + Nuggets', price: 17.99 },
-  { name: 'RC Turbo Corn Chips + Dips', price: 8.99 },
-  { name: 'Fresh Toastie', price: 8.99 },
+  { name: 'RC Turbo Corn Chips + Dips', price: 6.99 },
+  { name: 'Fresh Toastie', price: 8.99, options: 'Ham & Cheese / Cheese Only' },
   { name: 'Fresh Toastie + Corn Chips + Dips', price: 16.99 },
-  { name: 'RC Corn Dog Turbo', price: 12.99 },
+  { name: 'RC Corn Dog Turbo', price: 12.99, options: 'Cheese & Sausage / Mozzarella / Potato Cheese Corndog' },
   { name: 'RC Jalapeno Bites', price: 9.99 },
   { name: 'RC Loaded Chicken Strips', price: 12.99 }
 ]

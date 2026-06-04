@@ -32,7 +32,7 @@ export default function MachineCard({ m, index = 0 }) {
         <div className="mt-4 flex items-center justify-between">
           <span className="text-[11px] uppercase tracking-widest text-orange-600 font-bold">{m.capacity}/slot</span>
           <Link
-            to="/booking"
+            to="/booking#calendar"
             className="inline-flex items-center gap-1 text-sm font-bold text-charcoal-300 hover:text-orange-600"
           >
             Book <ArrowRight size={14} />

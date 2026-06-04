@@ -16,12 +16,8 @@ export default function Footer() {
     <footer className="relative bg-bg-soft text-charcoal-300 border-t border-border">
       <div className="container-x grid grid-cols-1 md:grid-cols-12 gap-10 py-14">
         <div className="md:col-span-4">
-          <Link to="/" className="flex items-center gap-3">
-            <Logo className="h-14 w-auto" />
-            <div>
-              <div className="font-display text-xl font-extrabold">RC Cafe</div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-orange-600 font-bold">Remote Control Arena</div>
-            </div>
+          <Link to="/" className="inline-flex items-center" aria-label="RC Cafe — Home">
+            <Logo className="h-24 w-auto max-w-[230px] sm:h-28 sm:max-w-[270px]" />
           </Link>
           <p className="mt-5 text-sm leading-relaxed text-muted max-w-sm">
             Auckland’s hands-on remote-control construction arena and café — a fun, safe place for
@@ -55,7 +51,7 @@ export default function Footer() {
             <li className="flex items-start gap-3 text-charcoal-100"><MapPin size={18} className="mt-0.5 text-orange-600" /> {SITE.location}</li>
             <li className="flex items-start gap-3 text-charcoal-100"><Clock size={18} className="mt-0.5 text-orange-600" /> {SITE.hours}</li>
           </ul>
-          <Link to="/booking" className="btn-primary mt-6">Book Your Session</Link>
+          <Link to="/booking#calendar" className="btn-primary mt-6">Book Your Session</Link>
         </div>
       </div>
 

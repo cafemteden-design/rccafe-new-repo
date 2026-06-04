@@ -27,9 +27,9 @@ export default function Header() {
           : 'bg-white/85 backdrop-blur border-b border-white/20 shadow-md'
       }`}
     >
-      <div className="container-x flex h-20 items-center justify-between">
+      <div className="container-x flex h-24 items-center justify-between">
         <Link to="/" className="flex items-center group" aria-label="RC Cafe — Home">
-          <Logo className="h-[52px] sm:h-[64px] w-auto transition-transform group-hover:scale-[1.03]" />
+          <Logo className="h-[74px] w-auto max-w-[166px] transition-transform group-hover:scale-[1.03] sm:h-[84px] sm:max-w-[190px]" />
         </Link>
 
         <nav className="hidden lg:flex items-center gap-1">
@@ -65,7 +65,7 @@ export default function Header() {
           >
             <Phone size={16} /> {SITE.phone}
           </a>
-          <Link to="/booking" className="btn-primary !py-2.5">
+          <Link to="/booking#calendar" className="btn-primary !py-2.5">
             Book Now
           </Link>
         </div>
@@ -86,7 +86,7 @@ export default function Header() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'tween', duration: 0.3 }}
-            className="lg:hidden fixed inset-y-0 right-0 top-20 w-[82%] max-w-sm border-l border-border bg-white shadow-card"
+            className="lg:hidden fixed inset-y-0 right-0 top-24 w-[82%] max-w-sm border-l border-border bg-white shadow-card"
           >
             <div className="flex flex-col p-6 gap-2">
               {NAV.map((n) => (
@@ -103,7 +103,7 @@ export default function Header() {
                   <span className="text-orange-500">›</span>
                 </NavLink>
               ))}
-              <Link to="/booking" className="btn-primary mt-4 w-full">Book Now</Link>
+              <Link to="/booking#calendar" className="btn-primary mt-4 w-full">Book Now</Link>
               <a
                 href={`tel:${SITE.phoneTel}`}
                 className="btn-outline mt-2 w-full"

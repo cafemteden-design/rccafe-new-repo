@@ -63,7 +63,7 @@ export default function VideoRail() {
   }, [paused, lightbox])
 
   return (
-    <section className="section-light py-14 sm:py-20" id="videos">
+    <section className="section-light py-14 sm:py-20 overflow-hidden" id="videos">
       <div className="container-x">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div className="max-w-2xl">
@@ -77,7 +77,7 @@ export default function VideoRail() {
           </div>
         </div>
 
-        <div className="mt-10 -mx-4 sm:mx-0">
+        <div className="mt-10 max-w-full overflow-hidden">
           <div
             ref={railRef}
             className="flex gap-4 sm:gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth px-4 sm:px-0 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
@@ -148,7 +148,6 @@ function VideoCard({ item, index, onExpand }) {
             muted={muted}
             loop
             playsInline
-            webkit-playsinline
             autoPlay
             preload="metadata"
             className="absolute inset-0 h-full w-full object-cover bg-bg-soft"

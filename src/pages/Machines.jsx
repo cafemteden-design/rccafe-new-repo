@@ -23,9 +23,13 @@ export default function Machines() {
       </section>
       <section className="section-soft py-12 sm:py-16">
         <div className="container-x">
-          <SectionHeading eyebrow="Bring Your Own" title={<>Got Your Own <span className="accent">RC Toy?</span></>} subtitle="Use our sand construction arena with your personal RC vehicle for just $10 per hour." />
+          <SectionHeading
+            eyebrow="RC + Food Garage"
+            title={<>Choose a <span className="accent">Package</span></>}
+            subtitle="Book MINI, POWER or MASTER packages with play time, any toastie and any hot coffee."
+          />
           <div className="mt-8 text-center">
-            <Link to="/booking" className="btn-primary">Book BYO Slot</Link>
+            <Link to="/booking#calendar" className="btn-primary">Book Package</Link>
           </div>
         </div>
       </section>

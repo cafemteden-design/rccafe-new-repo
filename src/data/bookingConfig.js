@@ -6,51 +6,48 @@ export const BOOKING_CONFIG = {
     start: { hour: 9, minute: 0 },
     end: { hour: 16, minute: 0 }
   },
-  playTime: '45 Minutes',
-  sessionDuration: 45,
   maxCapacity: 5,
-  slotStartTimes: [
-    9 * 60,
-    9 * 60 + 45,
-    10 * 60 + 30,
-    11 * 60 + 15,
-    12 * 60,
-    12 * 60 + 45,
-    13 * 60 + 30,
-    14 * 60 + 15,
-    15 * 60
-  ]
+  defaultSlotDuration: 45
 }
 
 export function isBookingApiConfigured() {
   return Boolean(BOOKING_API_URL)
 }
 
-export function generateSlotsForDate(date, availability = {}) {
-  const { operatingDays, slotStartTimes } = BOOKING_CONFIG
+export function generateSlotsForDate(date, availability = {}, durationMinutes = BOOKING_CONFIG.defaultSlotDuration) {
+  const { operatingDays } = BOOKING_CONFIG
   const availabilityBySlot = normalizeAvailability(availability)
+  const slotDuration = Number(durationMinutes) || BOOKING_CONFIG.defaultSlotDuration
 
-  if (!date || !operatingDays.includes(date.getDay()) || Object.keys(availabilityBySlot).length === 0) {
+  if (!date || !operatingDays.includes(date.getDay()) || slotDuration <= 0) {
     return []
   }
 
-  return slotStartTimes.reduce((slots, minutes, index) => {
-    const time = formatTime(minutes)
-    const slotAvailability = availabilityBySlot[time]
-    if (!slotAvailability) return slots
+  const startMinutes = BOOKING_CONFIG.operatingHours.start.hour * 60 + BOOKING_CONFIG.operatingHours.start.minute
+  const endMinutes = BOOKING_CONFIG.operatingHours.end.hour * 60 + BOOKING_CONFIG.operatingHours.end.minute
+  const slotStartTimes = []
 
-    const available = Math.max(Number(slotAvailability.available), 0)
+  for (let minutes = startMinutes; minutes + slotDuration <= endMinutes; minutes += slotDuration) {
+    slotStartTimes.push(minutes)
+  }
 
-    slots.push({
+  return slotStartTimes.map((minutes, index) => {
+    const startTime = formatTime(minutes)
+    const endTime = formatTime(minutes + slotDuration)
+    const slotAvailability = availabilityBySlot[startTime] || availabilityBySlot[`${startTime} - ${endTime}`]
+    const available = Math.max(Number(slotAvailability?.available ?? BOOKING_CONFIG.maxCapacity), 0)
+
+    return {
       index,
-      time,
+      time: `${startTime} - ${endTime}`,
+      startTime,
+      endTime,
+      durationMinutes: slotDuration,
       available,
       maxCapacity: BOOKING_CONFIG.maxCapacity,
-      status: slotAvailability.status
-    })
-
-    return slots
-  }, [])
+      status: slotAvailability?.status || getSlotStatus(available)
+    }
+  })
 }
 
 export async function fetchSlotAvailability(date) {
@@ -103,6 +100,10 @@ async function parseJsonResponse(response) {
 }
 
 function normalizeAvailability(availability) {
+  if (!Array.isArray(availability) && Array.isArray(availability?.value)) {
+    return normalizeAvailability(availability.value)
+  }
+
   if (Array.isArray(availability)) {
     return availability.reduce((slots, item, index) => {
       const slot = normalizeSlotLabel(item?.slot, index)
@@ -139,7 +140,7 @@ function normalizeSlotLabel(slot, index) {
     return slot.trim().toUpperCase()
   }
 
-  const configuredSlot = BOOKING_CONFIG.slotStartTimes[index]
+  const configuredSlot = getDefaultSlotStartTimes()[index]
   return configuredSlot === undefined ? '' : formatTime(configuredSlot)
 }
 
@@ -149,7 +150,19 @@ function getSlotStatus(available) {
   return 'available'
 }
 
-function formatTime(minutes) {
+function getDefaultSlotStartTimes() {
+  const startMinutes = BOOKING_CONFIG.operatingHours.start.hour * 60 + BOOKING_CONFIG.operatingHours.start.minute
+  const endMinutes = BOOKING_CONFIG.operatingHours.end.hour * 60 + BOOKING_CONFIG.operatingHours.end.minute
+  const slots = []
+
+  for (let minutes = startMinutes; minutes + BOOKING_CONFIG.defaultSlotDuration <= endMinutes; minutes += BOOKING_CONFIG.defaultSlotDuration) {
+    slots.push(minutes)
+  }
+
+  return slots
+}
+
+export function formatTime(minutes) {
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
   const period = hours >= 12 ? 'PM' : 'AM'
@@ -170,8 +183,7 @@ export function isOperatingDay(date) {
 }
 
 export function isPastDate(date) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const today = getAucklandToday()
   const target = new Date(date)
   target.setHours(0, 0, 0, 0)
   return target < today
@@ -179,8 +191,7 @@ export function isPastDate(date) {
 
 export function getAvailableDates() {
   const dates = []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const today = getAucklandToday()
 
   for (let i = 0; i < 30; i++) {
     const date = new Date(today)
@@ -192,6 +203,18 @@ export function getAvailableDates() {
   }
 
   return dates
+}
+
+export function getAucklandToday() {
+  const parts = new Intl.DateTimeFormat('en-NZ', {
+    timeZone: 'Pacific/Auckland',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date())
+
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return new Date(Number(values.year), Number(values.month) - 1, Number(values.day))
 }
 
 export function validateBookingData(data) {
@@ -240,7 +263,7 @@ export function formatDateDisplay(date) {
 }
 
 export function getSlotTime(slotIndex) {
-  const { slotStartTimes } = BOOKING_CONFIG
+  const slotStartTimes = getDefaultSlotStartTimes()
   if (slotIndex < 0 || slotIndex >= slotStartTimes.length) return ''
   return formatTime(slotStartTimes[slotIndex])
 }

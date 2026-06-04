@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Coffee, GlassWater, Cookie, IceCream2, Sparkles, Plus, CupSoda, Utensils } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Coffee, GlassWater, Cookie, IceCream2, Sparkles, Plus, CupSoda, Utensils, ArrowRight } from 'lucide-react'
 import PageHero from '../components/PageHero.jsx'
 import { MENU, RC_PACKAGES, TOASTIE_CHOICES, COFFEE_CHOICES, UPGRADED_PLAY, FOOD_ITEMS, MENU_NOTES } from '../data/menu.js'
 
@@ -9,9 +10,9 @@ const ICONS = {
   'Non-Coffee': CupSoda,
   Tea: Cookie,
   'Cold Drinks': GlassWater,
-  'Frappé': IceCream2,
+  Frappe: IceCream2,
   Smoothies: Sparkles,
-  Shakes: CupSoda,
+  Shake: CupSoda,
   Extras: Plus
 }
 
@@ -120,6 +121,9 @@ function PackageSection() {
               <li>Any Toastie</li>
               <li>Any Hot Coffee</li>
             </ul>
+            <Link to={`/booking?package=${encodeURIComponent(pkg.name)}#calendar`} className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-orange-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-orange-600">
+              Book Package <ArrowRight size={14} className="ml-2" />
+            </Link>
           </div>
         ))}
       </div>
@@ -144,9 +148,12 @@ function PackageSection() {
         <h3 className="font-display text-xl font-extrabold text-charcoal-300">Food Items</h3>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {FOOD_ITEMS.map((item) => (
-            <div key={item.name} className="flex items-center justify-between gap-4 rounded-lg border border-border bg-white px-4 py-3 shadow-soft">
-              <span className="font-semibold text-charcoal-300">{item.name}</span>
-              <span className="font-display text-lg font-extrabold text-orange-600">${item.price.toFixed(2)}</span>
+            <div key={item.name} className="rounded-lg border border-border bg-white px-4 py-3 shadow-soft">
+              <div className="flex items-start justify-between gap-4">
+                <span className="font-semibold text-charcoal-300">{item.name}</span>
+                <span className="shrink-0 font-display text-lg font-extrabold text-orange-600">${item.price.toFixed(2)}</span>
+              </div>
+              {item.options && <div className="mt-1 text-xs text-muted">{item.options}</div>}
             </div>
           ))}
         </div>

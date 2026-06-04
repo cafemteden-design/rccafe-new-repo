@@ -39,7 +39,7 @@ export default function About() {
               bubble tea or fresh smoothies and snack on hot air-fried bites.
             </p>
             <div className="mt-7 flex gap-3">
-              <Link to="/booking" className="btn-primary">Book Now</Link>
+              <Link to="/booking#calendar" className="btn-primary">Book Now</Link>
               <Link to="/machines" className="btn-outline">See Machines</Link>
             </div>
           </motion.div>
@@ -72,7 +72,7 @@ export default function About() {
           <h2 className="heading-display">Come Build With Us</h2>
           <p className="mt-4 max-w-2xl mx-auto text-muted">Visit RC Cafe in Auckland — call <a href="tel:+6495587570" className="text-orange-600 font-bold">09 558 7570</a> to plan your group, party or first session.</p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/booking" className="btn-primary">Book a Slot</Link>
+            <Link to="/booking#calendar" className="btn-primary">Book a Slot</Link>
             <Link to="/contact" className="btn-outline">Contact Us</Link>
           </div>
         </div>
