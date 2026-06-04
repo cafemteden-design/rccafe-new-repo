@@ -265,6 +265,10 @@ export function validateBookingData(data) {
     errors.slotIndex = 'Please select a slot time'
   }
 
+  if (!data.confirmAttendance) {
+    errors.confirmAttendance = 'Please confirm your attendance before reserving your slot'
+  }
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors

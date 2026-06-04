@@ -19,6 +19,8 @@ Frontend payload includes:
   "packageName": "POWER",
   "packagePrice": 45,
   "playTime": "45 Min Play",
+  "bookingStatus": "Pending Confirmation",
+  "adminStatus": "Pending Confirmation",
   "toastieChoice": "",
   "coffeeChoice": ""
 }
@@ -60,6 +62,7 @@ function doPost(e) {
     const packageName = String(data.packageName || '').trim();
     const packagePrice = String(data.packagePrice || '').trim();
     const playTime = String(data.playTime || '').trim();
+    const bookingStatus = String(data.bookingStatus || data.adminStatus || 'Pending Confirmation').trim();
 
     if (!name || !phone || !email || !date || !slotTime) {
       return jsonResponse({
@@ -83,7 +86,8 @@ function doPost(e) {
       slotTime,
       packageName,
       packagePrice,
-      playTime
+      playTime,
+      bookingStatus
     ]);
 
     // Keep the existing admin/client email notification logic here.
@@ -120,4 +124,22 @@ Correct:
 ```javascript
 const phone = String(data.phone || '').trim();
 sheet.appendRow([name, phone, email]);
+```
+
+## Admin Status Options
+
+Default status:
+
+```text
+Pending Confirmation
+```
+
+Admin can change status to:
+
+```text
+Pending Confirmation
+Confirmed
+Completed
+Cancelled
+No Show
 ```
