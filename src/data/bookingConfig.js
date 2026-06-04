@@ -76,10 +76,12 @@ export async function submitBooking(booking) {
     }
   }
 
+  const payload = normalizeBookingPayload(booking)
+
   const response = await fetch(BOOKING_API_URL, {
     method: 'POST',
     headers: { Accept: 'application/json' },
-    body: JSON.stringify(booking)
+    body: JSON.stringify(payload)
   })
 
   if (!response.ok) {
@@ -87,6 +89,19 @@ export async function submitBooking(booking) {
   }
 
   return parseJsonResponse(response)
+}
+
+function normalizeBookingPayload(booking) {
+  const phone = String(booking?.phone || booking?.customerPhone || booking?.userPhone || '').trim()
+
+  return {
+    ...booking,
+    phone,
+    customerPhone: phone,
+    userPhone: phone,
+    mobile: phone,
+    mobileNumber: phone
+  }
 }
 
 async function parseJsonResponse(response) {
@@ -225,7 +240,7 @@ export function validateBookingData(data) {
   }
 
   if (!data.phone || data.phone.trim().length < 6) {
-    errors.phone = 'Please enter your mobile number'
+    errors.phone = 'Please enter your phone number'
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

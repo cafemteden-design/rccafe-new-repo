@@ -186,7 +186,7 @@ export default function Booking() {
       } else if (status === 'validation_error') {
         setErrors({ submit: result?.message || 'Please check your booking details and try again.' })
       } else if (status === 'error') {
-        setErrors({ submit: result?.message || result?.error || 'Unable to submit booking request right now. Please try again or contact us.' })
+        setErrors({ submit: getFriendlySubmitError(result, bookingData) })
       } else {
         setErrors({ submit: 'Unable to check availability right now. Please try again or contact us.' })
       }
@@ -276,6 +276,22 @@ export default function Booking() {
       <EventsBookingSection />
     </>
   )
+}
+
+function getFriendlySubmitError(result, bookingData) {
+  const rawMessage = String(result?.message || result?.error || '').trim()
+
+  if (!bookingData.phone) {
+    return 'Please enter your phone number'
+  }
+
+  const normalizedMessage = rawMessage.toLowerCase()
+
+  if (normalizedMessage.includes('phone') && normalizedMessage.includes('not defined')) {
+    return 'Unable to submit booking request right now. Please contact us to complete your booking.'
+  }
+
+  return rawMessage || 'Unable to submit booking request right now. Please try again or contact us.'
 }
 
 function EventsBookingSection() {
