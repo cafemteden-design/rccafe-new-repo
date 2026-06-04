@@ -93,6 +93,9 @@ export async function submitBooking(booking) {
 
 function normalizeBookingPayload(booking) {
   const phone = String(booking?.phone || booking?.customerPhone || booking?.userPhone || '').trim()
+  const slotTime = String(booking?.slotTime || booking?.slot || booking?.time || '').trim()
+  const bookingStatus = String(booking?.bookingStatus || booking?.adminStatus || booking?.status || 'Pending Confirmation').trim()
+  const packageName = String(booking?.packageName || booking?.package || '').trim()
 
   return {
     ...booking,
@@ -100,7 +103,15 @@ function normalizeBookingPayload(booking) {
     customerPhone: phone,
     userPhone: phone,
     mobile: phone,
-    mobileNumber: phone
+    mobileNumber: phone,
+    slotTime,
+    slot: slotTime,
+    time: slotTime,
+    bookingStatus,
+    adminStatus: bookingStatus,
+    status: bookingStatus,
+    packageName,
+    package: packageName
   }
 }
 
@@ -115,20 +126,33 @@ async function parseJsonResponse(response) {
 }
 
 function normalizeAvailability(availability) {
+  if (!Array.isArray(availability) && Array.isArray(availability?.data)) {
+    return normalizeAvailability(availability.data)
+  }
+
   if (!Array.isArray(availability) && Array.isArray(availability?.value)) {
     return normalizeAvailability(availability.value)
   }
 
   if (Array.isArray(availability)) {
     return availability.reduce((slots, item, index) => {
-      const slot = normalizeSlotLabel(item?.slot, index)
+      const slot = normalizeSlotLabel(item?.slot || item?.slotTime || item?.time, index)
       if (!slot) return slots
       const isFull = String(item.status || '').toUpperCase() === 'FULLY BOOKED'
-      const available = isFull ? 0 : Number(item.available ?? 0)
-      slots[slot] = {
-        available,
-        status: isFull ? 'full' : getSlotStatus(available)
+      const hasAvailable = item.available !== undefined && item.available !== null && item.available !== ''
+
+      if (isFull || hasAvailable) {
+        const available = isFull ? 0 : Math.max(Number(item.available ?? BOOKING_CONFIG.maxCapacity), 0)
+        slots[slot] = {
+          available,
+          status: isFull ? 'full' : getSlotStatus(available)
+        }
+        return slots
       }
+
+      const currentAvailable = slots[slot]?.available ?? BOOKING_CONFIG.maxCapacity
+      const available = Math.max(currentAvailable - 1, 0)
+      slots[slot] = { available, status: getSlotStatus(available) }
       return slots
     }, {})
   }
@@ -150,13 +174,20 @@ function normalizeAvailability(availability) {
   }, {})
 }
 
-function normalizeSlotLabel(slot, index) {
+function normalizeSlotLabel(slot) {
+  if (slot === undefined || slot === null || slot === '') return ''
+
   if (typeof slot === 'string' && /^\d{2}:\d{2}\s[AP]M$/i.test(slot.trim())) {
     return slot.trim().toUpperCase()
   }
 
-  const configuredSlot = getDefaultSlotStartTimes()[index]
-  return configuredSlot === undefined ? '' : formatTime(configuredSlot)
+  if (typeof slot === 'string' && /^\d{1,2}:\d{2}\s[AP]M$/i.test(slot.trim())) {
+    const [time, period] = slot.trim().toUpperCase().split(/\s+/)
+    const [hour, minute] = time.split(':')
+    return `${hour.padStart(2, '0')}:${minute} ${period}`
+  }
+
+  return ''
 }
 
 function getSlotStatus(available) {
