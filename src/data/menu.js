@@ -91,7 +91,31 @@ export const UPGRADED_PLAY = [
   { id: 'upgrade-30', name: 'Upgraded Play 30 Min', playTime: '30 Min Play', durationMinutes: 30, price: 20, summary: '30 Min Play' }
 ]
 
-export const BOOKING_OPTIONS = [...RC_PACKAGES, ...UPGRADED_PLAY]
+export const PLAY_UPGRADES = [
+  {
+    id: 'none',
+    name: 'No Extra Time',
+    durationMinutes: 0,
+    price: 0,
+    summary: 'Keep included package play time'
+  },
+  {
+    id: 'extra-15',
+    name: 'Add 15 Min Extra Play',
+    durationMinutes: 15,
+    price: 15,
+    summary: '+15 Min extra play'
+  },
+  {
+    id: 'extra-30',
+    name: 'Add 30 Min Extra Play',
+    durationMinutes: 30,
+    price: 20,
+    summary: '+30 Min extra play'
+  }
+]
+
+export const BOOKING_OPTIONS = RC_PACKAGES
 
 export const TOASTIE_CHOICES = ['Ham & Cheese', 'Cheese Only', 'Butter Toast']
 

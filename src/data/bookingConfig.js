@@ -96,6 +96,13 @@ function normalizeBookingPayload(booking) {
   const slotTime = String(booking?.slotTime || booking?.slot || booking?.time || '').trim()
   const bookingStatus = String(booking?.bookingStatus || booking?.adminStatus || booking?.status || 'Pending Confirmation').trim()
   const packageName = String(booking?.packageName || booking?.package || '').trim()
+  const baseDuration = Number(booking?.baseDuration || booking?.packageDuration || 0)
+  const extraDuration = Number(booking?.extraDuration || booking?.upgradeDuration || 0)
+  const totalPlayTime = String(booking?.totalPlayTime || booking?.playTime || '').trim()
+  const basePrice = Number(booking?.basePrice || 0)
+  const upgradePrice = Number(booking?.upgradePrice || 0)
+  const totalPrice = Number(booking?.totalPrice || booking?.packagePrice || booking?.price || 0)
+  const upgradeSelected = String(booking?.upgradeSelected || booking?.upgradeName || 'No Extra Time').trim()
 
   return {
     ...booking,
@@ -111,7 +118,20 @@ function normalizeBookingPayload(booking) {
     adminStatus: bookingStatus,
     status: bookingStatus,
     packageName,
-    package: packageName
+    package: packageName,
+    baseDuration,
+    packageDuration: baseDuration,
+    upgradeSelected,
+    upgradeName: upgradeSelected,
+    extraDuration,
+    upgradeDuration: extraDuration,
+    totalPlayTime,
+    playTime: totalPlayTime,
+    basePrice,
+    upgradePrice,
+    totalPrice,
+    packagePrice: totalPrice,
+    price: totalPrice
   }
 }
 

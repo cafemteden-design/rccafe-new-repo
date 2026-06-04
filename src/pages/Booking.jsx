@@ -5,7 +5,7 @@ import {
   Calendar, Clock, Users, ArrowRight, ArrowLeft, CheckCircle2, Mail, Phone, User, ChevronLeft, ChevronRight, X, Coffee, Cake, Building2, GraduationCap, Gift
 } from 'lucide-react'
 import PageHero from '../components/PageHero.jsx'
-import { BOOKING_OPTIONS } from '../data/menu.js'
+import { PLAY_UPGRADES, RC_PACKAGES } from '../data/menu.js'
 import { SITE } from '../data/site.js'
 import {
   generateSlotsForDate,
@@ -47,6 +47,40 @@ const IMPORTANT_INFO = [
 function startOfMonth(d) { const x = new Date(d); x.setDate(1); x.setHours(0, 0, 0, 0); return x }
 function addMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth() + n); return x }
 function isSameDay(a, b) { return a && b && a.toDateString() === b.toDateString() }
+function formatMinutes(minutes) { return `${Number(minutes) || 0} Min` }
+
+function getSelectedPackage(packageId) {
+  return RC_PACKAGES.find((item) => item.id === packageId) || null
+}
+
+function getSelectedUpgrade(upgradeId) {
+  return PLAY_UPGRADES.find((item) => item.id === upgradeId) || PLAY_UPGRADES[0]
+}
+
+function getBookingTotals(packageId, upgradeId) {
+  const selectedPackage = getSelectedPackage(packageId)
+  const selectedUpgrade = getSelectedUpgrade(upgradeId)
+  const baseDuration = Number(selectedPackage?.durationMinutes || 0)
+  const extraDuration = Number(selectedUpgrade?.durationMinutes || 0)
+  const basePrice = Number(selectedPackage?.price || 0)
+  const upgradePrice = Number(selectedUpgrade?.price || 0)
+  const totalDuration = baseDuration + extraDuration
+  const totalPrice = basePrice + upgradePrice
+
+  return {
+    selectedPackage,
+    selectedUpgrade,
+    baseDuration,
+    extraDuration,
+    totalDuration,
+    basePrice,
+    upgradePrice,
+    totalPrice,
+    basePlayTime: selectedPackage ? formatMinutes(baseDuration) : '',
+    extraPlayTime: extraDuration ? `+${formatMinutes(extraDuration)}` : 'No Extra Time',
+    totalPlayTime: selectedPackage ? formatMinutes(totalDuration) : ''
+  }
+}
 
 export default function Booking() {
   const [searchParams] = useSearchParams()
@@ -67,6 +101,7 @@ export default function Booking() {
     email: '',
     groupSize: 1,
     packageId: initialPackage?.id || '',
+    upgradeId: 'none',
     toastieChoice: '',
     coffeeChoice: '',
     confirmAttendance: false
@@ -78,20 +113,20 @@ export default function Booking() {
 
   useEffect(() => {
     let ignore = false
-    const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
+    const { selectedPackage, totalDuration } = getBookingTotals(data.packageId, data.upgradeId)
 
-    if (data.date && selectedPackage) {
+    if (data.date && selectedPackage && totalDuration > 0) {
       setIsLoadingSlots(true)
       setErrors((current) => ({ ...current, availability: '' }))
       setSlots([])
 
       fetchSlotAvailability(data.date)
         .then((availability) => {
-          if (!ignore) setSlots(generateSlotsForDate(data.date, availability, selectedPackage.durationMinutes))
+          if (!ignore) setSlots(generateSlotsForDate(data.date, availability, totalDuration))
         })
         .catch(() => {
           if (!ignore) {
-            setSlots(generateSlotsForDate(data.date, {}, selectedPackage.durationMinutes))
+            setSlots(generateSlotsForDate(data.date, {}, totalDuration))
             setErrors((current) => ({ ...current, availability: '' }))
           }
         })
@@ -104,13 +139,14 @@ export default function Booking() {
     }
 
     return () => { ignore = true }
-  }, [data.date, data.packageId])
+  }, [data.date, data.packageId, data.upgradeId])
 
   useEffect(() => {
     if (initialPackage?.id) {
       setData((current) => ({
         ...current,
         packageId: initialPackage.id,
+        upgradeId: 'none',
         slotIndex: null,
         toastieChoice: '',
         coffeeChoice: ''
@@ -135,7 +171,7 @@ export default function Booking() {
     switch (step) {
       case 0: return !!data.date
       case 1: {
-        const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
+        const selectedPackage = getSelectedPackage(data.packageId)
         return Boolean(selectedPackage)
       }
       case 2: {
@@ -157,7 +193,8 @@ export default function Booking() {
     }
 
     const selectedSlot = slots.find(s => s.index === data.slotIndex)
-    const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
+    const totals = getBookingTotals(data.packageId, data.upgradeId)
+    const { selectedPackage, selectedUpgrade } = totals
     if (!selectedSlot || selectedSlot.status === 'full' || selectedSlot.available <= 0) {
       setErrors({ submit: 'This slot is fully booked. Please choose another available slot.' })
       return
@@ -175,8 +212,18 @@ export default function Booking() {
       date: formatDateKey(data.date),
       slotTime: selectedSlot.startTime || selectedSlot.time,
       packageName: selectedPackage.name,
-      packagePrice: selectedPackage.price,
-      playTime: selectedPackage.playTime,
+      packagePrice: totals.totalPrice,
+      playTime: `${totals.totalPlayTime} Play`,
+      baseDuration: totals.baseDuration,
+      basePlayTime: totals.basePlayTime,
+      upgradeSelected: selectedUpgrade.name,
+      upgradeName: selectedUpgrade.name,
+      extraDuration: totals.extraDuration,
+      extraPlayTime: totals.extraPlayTime,
+      totalPlayTime: `${totals.totalPlayTime} Play`,
+      basePrice: totals.basePrice,
+      upgradePrice: totals.upgradePrice,
+      totalPrice: totals.totalPrice,
       bookingStatus: 'Pending Confirmation',
       adminStatus: 'Pending Confirmation',
       toastieChoice: '',
@@ -221,7 +268,7 @@ export default function Booking() {
     setSubmittedData(null)
     setStep(0)
     setErrors({})
-    setData({ date: null, slotIndex: null, name: '', phone: '', email: '', groupSize: 1, packageId: '', toastieChoice: '', coffeeChoice: '', confirmAttendance: false })
+    setData({ date: null, slotIndex: null, name: '', phone: '', email: '', groupSize: 1, packageId: '', upgradeId: 'none', toastieChoice: '', coffeeChoice: '', confirmAttendance: false })
   }
 
   return (
@@ -245,9 +292,9 @@ export default function Booking() {
                 <div className="mt-6 card min-w-0 p-6 sm:p-8 min-h-[420px]">
                   <AnimatePresence mode="wait">
                     <motion.div key={step} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.22 }}>
-                      {step === 0 && <StepDate date={data.date} availableDates={availableDates} viewMonth={viewMonth} setViewMonth={setViewMonth} onSelect={(d) => { update({ date: d, slotIndex: null }); setStep(data.packageId ? 2 : 1) }} error={errors.date} />}
-                      {step === 1 && <StepPackage data={data} update={(patch) => { update(patch); if (patch.packageId) setStep(2) }} />}
-                      {step === 2 && <StepTime slots={slots} slotIndex={data.slotIndex} selectedPackage={BOOKING_OPTIONS.find((item) => item.id === data.packageId)} onSelect={(i) => { update({ slotIndex: i }); setStep(3) }} isLoading={isLoadingSlots} error={errors.slotIndex || errors.availability} />}
+                      {step === 0 && <StepDate date={data.date} availableDates={availableDates} viewMonth={viewMonth} setViewMonth={setViewMonth} onSelect={(d) => { update({ date: d, slotIndex: null }); setStep(1) }} error={errors.date} />}
+                      {step === 1 && <StepPackage data={data} update={update} />}
+                      {step === 2 && <StepTime slots={slots} slotIndex={data.slotIndex} totals={getBookingTotals(data.packageId, data.upgradeId)} onSelect={(i) => { update({ slotIndex: i }); setStep(3) }} isLoading={isLoadingSlots} error={errors.slotIndex || errors.availability} />}
                       {step === 3 && <StepDetails data={data} update={update} errors={errors} />}
                       {step === 4 && <StepConfirm data={data} slots={slots} update={update} error={errors.confirmAttendance} />}
                     </motion.div>
@@ -369,7 +416,7 @@ function EventsBookingSection() {
 function getPackageFromParam(value) {
   if (!value) return null
   const normalized = value.trim().toLowerCase()
-  return BOOKING_OPTIONS.find((item) => (
+  return RC_PACKAGES.find((item) => (
     item.id.toLowerCase() === normalized || item.name.toLowerCase() === normalized
   )) || null
 }
@@ -459,13 +506,14 @@ function StepDate({ date, availableDates, viewMonth, setViewMonth, onSelect, err
   )
 }
 
-/* ----------------------------- Step 1: Time ------------------------------ */
-function StepTime({ slots, slotIndex, selectedPackage, onSelect, isLoading, error }) {
+/* ----------------------------- Step 2: Time ------------------------------ */
+function StepTime({ slots, slotIndex, totals, onSelect, isLoading, error }) {
+  const selectedPackage = totals.selectedPackage
   return (
     <div>
       <Heading
         title="Select Time Slot"
-        sub={selectedPackage ? `${selectedPackage.name} runs for ${selectedPackage.durationMinutes} minutes. Each slot can accommodate up to 5 bookings.` : 'Please select a package first.'}
+        sub={selectedPackage ? `${selectedPackage.name} with ${totals.extraPlayTime.toLowerCase()} runs for ${totals.totalDuration} minutes. Each slot can accommodate up to 5 bookings.` : 'Please select a package first.'}
       />
       {isLoading && <p className="mt-4 text-sm font-semibold text-orange-700">Checking live availability...</p>}
       {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
@@ -506,35 +554,79 @@ function StepTime({ slots, slotIndex, selectedPackage, onSelect, isLoading, erro
   )
 }
 
-/* ---------------------------- Step 2: Details ---------------------------- */
+/* ---------------------------- Step 1: Package ---------------------------- */
 function StepPackage({ data, update }) {
+  const totals = getBookingTotals(data.packageId, data.upgradeId)
   return (
     <div>
       <Heading title="Select Package" sub="Choose your play package. Cafe food and drink choices are handled at the restaurant." />
-      <div className="mt-6 grid gap-3 md:grid-cols-2">
-        {BOOKING_OPTIONS.map((item) => {
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        {RC_PACKAGES.map((item) => {
           const selected = data.packageId === item.id
           return (
             <button
               key={item.id}
-              onClick={() => update({ packageId: item.id, slotIndex: null, toastieChoice: '', coffeeChoice: '' })}
-              className={`relative rounded-xl border p-4 text-left transition ${
+              onClick={() => update({ packageId: item.id, upgradeId: 'none', slotIndex: null, toastieChoice: '', coffeeChoice: '' })}
+              className={`relative min-h-[210px] rounded-2xl border p-5 text-left transition ${
                 selected ? 'border-orange-500 bg-orange-50 shadow-glow' : 'border-border bg-white hover:border-orange-300'
               }`}
             >
               {item.badge && <span className="absolute right-3 top-3 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">{item.badge}</span>}
-              <div className="pr-28">
+              <div className="pr-20">
                 <div className="font-display text-xl font-extrabold text-charcoal-300">{item.name}</div>
                 <div className="mt-1 text-sm font-semibold text-orange-700">{item.summary}</div>
               </div>
-              <div className="mt-4 flex items-end justify-between gap-4">
+              <div className="mt-8 flex items-end justify-between gap-4">
                 <span className="text-xs uppercase tracking-widest text-muted font-bold">{item.playTime}</span>
                 <span className="font-display text-3xl font-extrabold text-orange-600">${item.price}</span>
               </div>
+              {selected && (
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-bold text-green-700">
+                  <CheckCircle2 size={14} /> Selected
+                </div>
+              )}
             </button>
           )
         })}
       </div>
+
+      {totals.selectedPackage && (
+        <div className="mt-7 rounded-2xl border border-orange-200 bg-orange-50/60 p-4 sm:p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-orange-600">Optional</div>
+              <h3 className="font-display text-xl font-extrabold text-charcoal-300">Upgrade Your Play Time</h3>
+              <p className="mt-1 text-sm text-muted">No extra time is selected by default.</p>
+            </div>
+            <div className="rounded-full bg-white px-4 py-2 text-sm font-extrabold text-charcoal-300 shadow-sm">
+              Total: {totals.totalPlayTime} • ${totals.totalPrice}
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {PLAY_UPGRADES.map((upgrade) => {
+              const selected = data.upgradeId === upgrade.id
+              const price = upgrade.price === 0 ? '$0' : `+$${upgrade.price}`
+
+              return (
+                <button
+                  key={upgrade.id}
+                  onClick={() => update({ upgradeId: upgrade.id, slotIndex: null })}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    selected ? 'border-orange-500 bg-white shadow-glow' : 'border-orange-100 bg-white hover:border-orange-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="font-display text-base font-extrabold text-charcoal-300">{upgrade.name}</div>
+                    {selected && <CheckCircle2 size={18} className="flex-shrink-0 text-green-600" />}
+                  </div>
+                  <div className="mt-2 text-xs font-bold uppercase tracking-widest text-muted">{upgrade.summary}</div>
+                  <div className="mt-3 text-2xl font-extrabold text-orange-600">{price}</div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -558,7 +650,8 @@ function StepDetails({ data, update, errors }) {
 /* ---------------------------- Step 4: Confirm ---------------------------- */
 function StepConfirm({ data, slots, update, error }) {
   const selectedSlot = slots.find(s => s.index === data.slotIndex)
-  const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
+  const totals = getBookingTotals(data.packageId, data.upgradeId)
+  const selectedPackage = totals.selectedPackage
   return (
     <div>
       <Heading title="Review Your Booking" sub="Everything looks good? Reserve your preferred session and our team will confirm it shortly." />
@@ -568,8 +661,11 @@ function StepConfirm({ data, slots, update, error }) {
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <PremiumSummaryRow icon={Calendar} label="Date" value={formatDateDisplay(data.date)} />
           <PremiumSummaryRow icon={Clock} label="Time" value={selectedSlot?.time || '-'} />
-          <PremiumSummaryRow icon={Coffee} label="Package" value={selectedPackage ? `${selectedPackage.name} - $${selectedPackage.price}` : '-'} />
-          <PremiumSummaryRow icon={Clock} label="Duration" value={selectedPackage?.playTime || '-'} />
+          <PremiumSummaryRow icon={Coffee} label="Package" value={selectedPackage ? `${selectedPackage.name} - $${totals.basePrice}` : '-'} />
+          <PremiumSummaryRow icon={Clock} label="Base Play Time" value={totals.basePlayTime || '-'} />
+          <PremiumSummaryRow icon={Clock} label="Extra Play Time" value={totals.extraPlayTime || '-'} />
+          <PremiumSummaryRow icon={Clock} label="Total Play Time" value={totals.totalPlayTime || '-'} />
+          <PremiumSummaryRow icon={Coffee} label="Total Price" value={selectedPackage ? `$${totals.totalPrice}` : '-'} />
           <PremiumSummaryRow icon={User} label="Customer Name" value={data.name} />
           <PremiumSummaryRow icon={Phone} label="Phone Number" value={data.phone} />
         </div>
@@ -603,15 +699,18 @@ function StepConfirm({ data, slots, update, error }) {
 /* ------------------------- Sidebar / Success ----------------------------- */
 function SummarySidebar({ data, slots }) {
   const selectedSlot = slots.find(s => s.index === data.slotIndex)
-  const selectedPackage = BOOKING_OPTIONS.find((item) => item.id === data.packageId)
+  const totals = getBookingTotals(data.packageId, data.upgradeId)
+  const selectedPackage = totals.selectedPackage
   return (
     <div className="sticky top-28 card p-6">
       <div className="text-[11px] uppercase tracking-widest text-orange-600 font-bold">Booking Summary</div>
       <div className="mt-4 space-y-3 text-sm">
         <SidebarLine label="Date" value={data.date ? formatDateDisplay(data.date) : '-'} />
         <SidebarLine label="Package" value={selectedPackage?.name || '-'} />
-        <SidebarLine label="Price" value={selectedPackage ? `$${selectedPackage.price}` : '-'} />
-        <SidebarLine label="Play Time" value={selectedPackage?.playTime || '-'} />
+        <SidebarLine label="Base Play" value={totals.basePlayTime || '-'} />
+        <SidebarLine label="Extra Play" value={selectedPackage ? totals.extraPlayTime : '-'} />
+        <SidebarLine label="Total Play" value={totals.totalPlayTime || '-'} />
+        <SidebarLine label="Total Price" value={selectedPackage ? `$${totals.totalPrice}` : '-'} />
         <SidebarLine label="Slot" value={selectedSlot?.time || '-'} />
         <SidebarLine label="Group Size" value={data.groupSize || '-'} />
       </div>
@@ -659,9 +758,11 @@ function SuccessCard({ data, onReset }) {
         <div className="flex justify-between"><span className="text-muted">Date</span><span className="font-semibold text-charcoal-300">{formatDateDisplay(date)}</span></div>
         <div className="flex justify-between"><span className="text-muted">Slot Time</span><span className="font-semibold text-charcoal-300">{data.slotTimeDisplay || data.slotTime}</span></div>
         <div className="flex justify-between"><span className="text-muted">Package</span><span className="font-semibold text-charcoal-300">{data.packageName}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Price</span><span className="font-semibold text-charcoal-300">${data.packagePrice}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Base Play Time</span><span className="font-semibold text-charcoal-300">{data.basePlayTime || '-'}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Extra Play Time</span><span className="font-semibold text-charcoal-300">{data.extraPlayTime || '-'}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Total Price</span><span className="font-semibold text-charcoal-300">${data.totalPrice ?? data.packagePrice}</span></div>
         <div className="flex justify-between"><span className="text-muted">Group Size</span><span className="font-semibold text-charcoal-300">{data.groupSize}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Play Time</span><span className="font-semibold text-charcoal-300">{data.playTime}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Total Play Time</span><span className="font-semibold text-charcoal-300">{data.totalPlayTime || data.playTime}</span></div>
       </div>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <Link to="/" className="btn-primary">Return to Home</Link>
