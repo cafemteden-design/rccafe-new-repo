@@ -75,10 +75,7 @@ export default function Booking() {
         .catch(() => {
           if (!ignore) {
             setSlots(generateSlotsForDate(data.date, {}, selectedPackage.durationMinutes))
-            setErrors((current) => ({
-              ...current,
-              availability: 'Live availability check is unavailable right now. You can select a slot, and we will confirm availability when you submit.'
-            }))
+            setErrors((current) => ({ ...current, availability: '' }))
           }
         })
         .finally(() => {
