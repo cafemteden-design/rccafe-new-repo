@@ -119,7 +119,7 @@ export const BOOKING_OPTIONS = RC_PACKAGES
 
 export const TOASTIE_CHOICES = ['Ham & Cheese', 'Cheese Only', 'Butter Toast']
 
-export const COFFEE_CHOICES = ['Black', 'Flat White', 'Latte', 'Cappuccino', 'Mocha', 'Hot Chocolate', 'Fluffy']
+export const COFFEE_CHOICES = ['Any Black', 'Flat White / Latte', 'Hot Choco / Cappuccino', 'Fluffy']
 
 export const FOOD_ITEMS = [
   { name: 'Turbo Wedges', price: 9.99 },

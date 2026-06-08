@@ -1,11 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Hostinger-ready: base './' produces relative asset paths so the build works
-// whether uploaded to public_html root, a subdomain root, OR a subfolder.
+// Absolute root asset paths keep React Router deep links such as
+// /rewards/card/demo and /staff/rewards working on Vercel/static hosts.
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  base: '/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

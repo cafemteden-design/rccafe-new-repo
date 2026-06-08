@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useId } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
-  Calendar, Clock, Users, ArrowRight, ArrowLeft, CheckCircle2, Mail, Phone, User, ChevronLeft, ChevronRight, X, Coffee, Cake, Building2, GraduationCap, Gift
+  Calendar, Clock, Users, ArrowRight, ArrowLeft, CheckCircle2, Mail, Phone, User, ChevronLeft, ChevronRight, X, Coffee, Cake, Building2, GraduationCap, Gift, MessageSquare
 } from 'lucide-react'
 import PageHero from '../components/PageHero.jsx'
-import { PLAY_UPGRADES, RC_PACKAGES } from '../data/menu.js'
+import { COFFEE_CHOICES, PLAY_UPGRADES, RC_PACKAGES, TOASTIE_CHOICES } from '../data/menu.js'
 import { SITE } from '../data/site.js'
 import {
   generateSlotsForDate,
@@ -18,7 +18,10 @@ import {
   validateBookingData
 } from '../data/bookingConfig.js'
 
-const STEPS = ['Select Date', 'Select Package', 'Select Slot', 'Fill Details', 'Submit']
+const RCC_EMAILS = ['cafemteden@gmail.com', 'mtedencafestaff@gmail.com']
+const RCC_EMAIL = RCC_EMAILS.join(',')
+
+const STEPS = ['Date', 'Package', 'Food', 'Time', 'Details', 'Summary']
 
 const EVENT_BOOKINGS = [
   { icon: Cake, title: 'Birthday Parties', desc: 'RC-themed birthdays for kids and adults.' },
@@ -104,6 +107,7 @@ export default function Booking() {
     upgradeId: 'none',
     toastieChoice: '',
     coffeeChoice: '',
+    notes: '',
     confirmAttendance: false
   })
 
@@ -127,7 +131,10 @@ export default function Booking() {
         .catch(() => {
           if (!ignore) {
             setSlots(generateSlotsForDate(data.date, {}, totalDuration))
-            setErrors((current) => ({ ...current, availability: '' }))
+            setErrors((current) => ({
+              ...current,
+              availability: 'We could not verify live availability, but you can still submit your request. RCC will confirm your slot by phone or WhatsApp.'
+            }))
           }
         })
         .finally(() => {
@@ -174,11 +181,13 @@ export default function Booking() {
         const selectedPackage = getSelectedPackage(data.packageId)
         return Boolean(selectedPackage)
       }
-      case 2: {
+      case 2:
+        return Boolean(data.toastieChoice && data.coffeeChoice)
+      case 3: {
         const selectedSlot = slots.find(s => s.index === data.slotIndex)
         return selectedSlot && selectedSlot.status !== 'full' && selectedSlot.available > 0
       }
-      case 3: return data.name.trim() && data.phone.trim() && data.email.trim() && data.groupSize > 0
+      case 4: return data.name.trim() && data.phone.trim() && data.email.trim() && data.groupSize > 0
       default: return true
     }
   }
@@ -206,15 +215,23 @@ export default function Booking() {
 
     const bookingData = {
       name: data.name.trim(),
+      customerName: data.name.trim(),
       phone: data.phone.trim(),
+      customerPhone: data.phone.trim(),
       email: data.email.trim(),
+      customerEmail: data.email.trim(),
       groupSize: Number(data.groupSize),
+      players: Number(data.groupSize),
       date: formatDateKey(data.date),
+      bookingDate: formatDateKey(data.date),
       slotTime: selectedSlot.startTime || selectedSlot.time,
+      bookingTime: selectedSlot.startTime || selectedSlot.time,
       packageName: selectedPackage.name,
       packagePrice: totals.totalPrice,
       playTime: `${totals.totalPlayTime} Play`,
       baseDuration: totals.baseDuration,
+      packageDuration: totals.totalDuration,
+      packageDurationMinutes: totals.totalDuration,
       basePlayTime: totals.basePlayTime,
       upgradeSelected: selectedUpgrade.name,
       upgradeName: selectedUpgrade.name,
@@ -226,8 +243,17 @@ export default function Booking() {
       totalPrice: totals.totalPrice,
       bookingStatus: 'Pending Confirmation',
       adminStatus: 'Pending Confirmation',
-      toastieChoice: '',
-      coffeeChoice: ''
+      toastieChoice: data.toastieChoice,
+      coffeeChoice: data.coffeeChoice,
+      toastieSelection: data.toastieChoice,
+      drinkSelection: data.coffeeChoice,
+      adminEmail: RCC_EMAILS[0],
+      staffEmail: RCC_EMAILS[1],
+      notificationEmails: RCC_EMAILS,
+      notificationEmail: RCC_EMAILS.join(','),
+      emailRecipients: RCC_EMAILS.join(','),
+      notes: data.notes.trim(),
+      source: 'website'
     }
     const bookingSummaryData = {
       ...bookingData,
@@ -253,11 +279,13 @@ export default function Booking() {
         setErrors({ submit: result?.message || 'Please check your booking details and try again.' })
       } else if (status === 'error') {
         setErrors({ submit: getFriendlySubmitError(result, bookingData) })
+      } else if (result?.success === false) {
+        setErrors({ submit: result?.message || result?.error || 'Please check your booking details and try again.' })
       } else {
-        setErrors({ submit: 'Unable to check availability right now. Please try again or contact us.' })
+        setErrors({ submit: result?.message || 'We could not submit your booking request right now. Please try again or contact RCC.' })
       }
     } catch (error) {
-      setErrors({ submit: 'Unable to check availability right now. Please try again or contact us.' })
+      setErrors({ submit: 'We could not submit your booking request right now. Please try again or contact RCC.' })
     } finally {
       setIsSubmitting(false)
     }
@@ -268,7 +296,7 @@ export default function Booking() {
     setSubmittedData(null)
     setStep(0)
     setErrors({})
-    setData({ date: null, slotIndex: null, name: '', phone: '', email: '', groupSize: 1, packageId: '', upgradeId: 'none', toastieChoice: '', coffeeChoice: '', confirmAttendance: false })
+    setData({ date: null, slotIndex: null, name: '', phone: '', email: '', groupSize: 1, packageId: '', upgradeId: 'none', toastieChoice: '', coffeeChoice: '', notes: '', confirmAttendance: false })
   }
 
   return (
@@ -290,15 +318,14 @@ export default function Booking() {
               <div className="min-w-0 lg:col-span-8">
                 <Stepper step={step} setStep={setStep} />
                 <div className="mt-6 card min-w-0 p-6 sm:p-8 min-h-[420px]">
-                  <AnimatePresence mode="wait">
-                    <motion.div key={step} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.22 }}>
-                      {step === 0 && <StepDate date={data.date} availableDates={availableDates} viewMonth={viewMonth} setViewMonth={setViewMonth} onSelect={(d) => { update({ date: d, slotIndex: null }); setStep(1) }} error={errors.date} />}
-                      {step === 1 && <StepPackage data={data} update={update} />}
-                      {step === 2 && <StepTime slots={slots} slotIndex={data.slotIndex} totals={getBookingTotals(data.packageId, data.upgradeId)} onSelect={(i) => { update({ slotIndex: i }); setStep(3) }} isLoading={isLoadingSlots} error={errors.slotIndex || errors.availability} />}
-                      {step === 3 && <StepDetails data={data} update={update} errors={errors} />}
-                      {step === 4 && <StepConfirm data={data} slots={slots} update={update} error={errors.confirmAttendance} />}
-                    </motion.div>
-                  </AnimatePresence>
+                  <div key={step}>
+                    {step === 0 && <StepDate date={data.date} availableDates={availableDates} viewMonth={viewMonth} setViewMonth={setViewMonth} onSelect={(d) => { update({ date: d, slotIndex: null }); setStep(1) }} error={errors.date} />}
+                    {step === 1 && <StepPackage data={data} update={update} />}
+                    {step === 2 && <StepFood data={data} update={update} errors={errors} />}
+                    {step === 3 && <StepTime slots={slots} slotIndex={data.slotIndex} totals={getBookingTotals(data.packageId, data.upgradeId)} onSelect={(i) => { update({ slotIndex: i }); setStep(4) }} isLoading={isLoadingSlots} error={errors.slotIndex || errors.availability} />}
+                    {step === 4 && <StepDetails data={data} update={update} errors={errors} />}
+                    {step === 5 && <StepConfirm data={data} slots={slots} update={update} error={errors.confirmAttendance} />}
+                  </div>
                 </div>
 
                 {errors.submit && (
@@ -321,7 +348,7 @@ export default function Booking() {
                       disabled={!canNext()}
                       className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {step < 3 ? 'Continue' : 'Review Booking'} <ArrowRight size={16} />
+                      {step < 4 ? 'Continue' : 'Review Booking'} <ArrowRight size={16} />
                     </button>
                   ) : (
                     <button
@@ -329,7 +356,7 @@ export default function Booking() {
                       disabled={isSubmitting}
                       className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full bg-orange-500 px-7 py-4 text-base font-extrabold text-white shadow-lg shadow-orange-500/30 transition hover:bg-orange-600 hover:shadow-orange-500/45 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[230px]"
                     >
-                      {isSubmitting ? 'Submitting...' : 'Reserve My Slot'} <CheckCircle2 size={18} />
+                      {isSubmitting ? 'Booking in progress...' : 'Confirm My Booking'} <CheckCircle2 size={18} />
                     </button>
                   )}
                 </div>
@@ -498,8 +525,18 @@ function StepDate({ date, availableDates, viewMonth, setViewMonth, onSelect, err
         )}
         {error && <p className="mt-3 text-xs font-semibold text-red-600">{error}</p>}
         <p className="mt-3 text-xs text-muted">Operating days: Monday-Friday only</p>
-        <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs leading-relaxed text-charcoal-300">
-          Saturday & Sunday online bookings are not available. We are open on weekends, but weekend sessions must be booked directly at the cafe or by contacting us.
+        <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 p-4 shadow-sm">
+          <div className="text-[11px] font-extrabold uppercase tracking-widest text-orange-700">Special Booking Notice</div>
+          <p className="mt-2 text-sm leading-relaxed text-charcoal-300">
+            Weekend bookings, School Holiday sessions, Public Holidays, Corporate Events, Private Functions and Group Bookings are managed separately and are not currently available through online booking.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-charcoal-300">
+            Please contact Remote Control Cafe directly and our team will assist with availability and reservations.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <a href={`tel:${SITE.phoneTel}`} className="btn-primary !py-2.5"><Phone size={16} /> Call RCC</a>
+            <a href={`mailto:${RCC_EMAIL}`} className="btn-outline !py-2.5"><Mail size={16} /> Email RCC</a>
+          </div>
         </div>
       </div>
     </div>
@@ -509,14 +546,24 @@ function StepDate({ date, availableDates, viewMonth, setViewMonth, onSelect, err
 /* ----------------------------- Step 2: Time ------------------------------ */
 function StepTime({ slots, slotIndex, totals, onSelect, isLoading, error }) {
   const selectedPackage = totals.selectedPackage
+  const isAvailabilityWarning = error?.startsWith('We could not verify live availability')
+
   return (
     <div>
       <Heading
         title="Select Time Slot"
-        sub={selectedPackage ? `${selectedPackage.name} with ${totals.extraPlayTime.toLowerCase()} runs for ${totals.totalDuration} minutes. Each slot can accommodate up to 5 bookings.` : 'Please select a package first.'}
+        sub={selectedPackage ? `${selectedPackage.name} runs for ${totals.totalDuration} minutes. Each slot can accommodate up to 5 bookings.` : 'Please select a package first.'}
       />
       {isLoading && <p className="mt-4 text-sm font-semibold text-orange-700">Checking live availability...</p>}
-      {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
+      {error && (
+        <div className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
+          isAvailabilityWarning
+            ? 'border-orange-200 bg-orange-50 text-orange-800'
+            : 'border-red-200 bg-red-50 text-red-700'
+        }`}>
+          {error}
+        </div>
+      )}
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
         {slots.map((slot) => {
           const selected = slotIndex === slot.index
@@ -557,9 +604,10 @@ function StepTime({ slots, slotIndex, totals, onSelect, isLoading, error }) {
 /* ---------------------------- Step 1: Package ---------------------------- */
 function StepPackage({ data, update }) {
   const totals = getBookingTotals(data.packageId, data.upgradeId)
+
   return (
     <div>
-      <Heading title="Select Package" sub="Choose your play package. Cafe food and drink choices are handled at the restaurant." />
+      <Heading title="Select Package" sub="Choose your RC play package. Every package includes any toastie and any hot coffee." />
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {RC_PACKAGES.map((item) => {
           const selected = data.packageId === item.id
@@ -567,17 +615,26 @@ function StepPackage({ data, update }) {
             <button
               key={item.id}
               onClick={() => update({ packageId: item.id, upgradeId: 'none', slotIndex: null, toastieChoice: '', coffeeChoice: '' })}
-              className={`relative min-h-[210px] rounded-2xl border p-5 text-left transition ${
-                selected ? 'border-orange-500 bg-orange-50 shadow-glow' : 'border-border bg-white hover:border-orange-300'
+              className={`relative min-h-[230px] overflow-hidden rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 ${
+                selected
+                  ? 'border-orange-500 bg-orange-50 shadow-glow ring-2 ring-orange-100'
+                  : item.badge
+                    ? 'border-orange-300 bg-white shadow-soft hover:border-orange-500 hover:shadow-glow'
+                    : 'border-border bg-white shadow-soft hover:border-orange-300 hover:shadow-card'
               }`}
             >
-              {item.badge && <span className="absolute right-3 top-3 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">{item.badge}</span>}
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-400 via-orange-500 to-charcoal-300" />
+              {item.badge && <span className="absolute right-3 top-4 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-glow">{item.badge}</span>}
               <div className="pr-20">
                 <div className="font-display text-xl font-extrabold text-charcoal-300">{item.name}</div>
-                <div className="mt-1 text-sm font-semibold text-orange-700">{item.summary}</div>
+                <div className="mt-1 text-sm font-bold uppercase tracking-widest text-orange-700">{item.playTime}</div>
               </div>
-              <div className="mt-8 flex items-end justify-between gap-4">
-                <span className="text-xs uppercase tracking-widest text-muted font-bold">{item.playTime}</span>
+              <div className="mt-5 grid gap-2 text-sm text-charcoal-300">
+                <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-600" /> Any Toastie</div>
+                <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-600" /> Any Hot Coffee</div>
+              </div>
+              <div className="mt-7 flex items-end justify-between gap-4">
+                <span className="text-xs font-bold uppercase tracking-widest text-muted">{item.durationMinutes} minute session</span>
                 <span className="font-display text-3xl font-extrabold text-orange-600">${item.price}</span>
               </div>
               {selected && (
@@ -591,17 +648,18 @@ function StepPackage({ data, update }) {
       </div>
 
       {totals.selectedPackage && (
-        <div className="mt-7 rounded-2xl border border-orange-200 bg-orange-50/60 p-4 sm:p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mt-7 rounded-3xl border border-orange-200 bg-orange-50/60 p-4 shadow-soft sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-orange-600">Optional</div>
               <h3 className="font-display text-xl font-extrabold text-charcoal-300">Upgrade Your Play Time</h3>
-              <p className="mt-1 text-sm text-muted">No extra time is selected by default.</p>
+              <p className="mt-1 text-sm text-muted">Add extra RC play time to your selected package.</p>
             </div>
             <div className="rounded-full bg-white px-4 py-2 text-sm font-extrabold text-charcoal-300 shadow-sm">
-              Total: {totals.totalPlayTime} • ${totals.totalPrice}
+              Total: {totals.totalPlayTime} | ${totals.totalPrice}
             </div>
           </div>
+
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {PLAY_UPGRADES.map((upgrade) => {
               const selected = data.upgradeId === upgrade.id
@@ -610,9 +668,12 @@ function StepPackage({ data, update }) {
               return (
                 <button
                   key={upgrade.id}
+                  type="button"
                   onClick={() => update({ upgradeId: upgrade.id, slotIndex: null })}
-                  className={`rounded-xl border p-4 text-left transition ${
-                    selected ? 'border-orange-500 bg-white shadow-glow' : 'border-orange-100 bg-white hover:border-orange-300'
+                  className={`rounded-2xl border p-4 text-left transition ${
+                    selected
+                      ? 'border-orange-500 bg-white shadow-glow'
+                      : 'border-orange-100 bg-white hover:border-orange-300 hover:shadow-soft'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -631,16 +692,81 @@ function StepPackage({ data, update }) {
   )
 }
 
-/* ---------------------------- Step 3: Details ---------------------------- */
+/* ---------------------------- Step 2: Food ---------------------------- */
+function StepFood({ data, update, errors }) {
+  return (
+    <div>
+      <Heading
+        title="Choose Your Food & Drink"
+        sub="Your selection helps our team prepare everything before your arrival."
+      />
+
+      <ChoiceGroup
+        title="Toastie Selection"
+        required
+        options={TOASTIE_CHOICES}
+        value={data.toastieChoice}
+        onSelect={(value) => update({ toastieChoice: value })}
+        error={errors.toastieChoice}
+      />
+
+      <ChoiceGroup
+        title="Drink Selection"
+        required
+        options={COFFEE_CHOICES}
+        value={data.coffeeChoice}
+        onSelect={(value) => update({ coffeeChoice: value })}
+        error={errors.coffeeChoice}
+      />
+    </div>
+  )
+}
+
+function ChoiceGroup({ title, required, options, value, onSelect, error }) {
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-2">
+        <h3 className="font-display text-lg font-extrabold text-charcoal-300">{title}</h3>
+        {required && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-orange-700">Required</span>}
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {options.map((option) => {
+          const selected = value === option
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onSelect(option)}
+              className={`rounded-2xl border p-4 text-left text-sm font-bold transition ${
+                selected
+                  ? 'border-orange-500 bg-orange-50 text-charcoal-300 shadow-glow'
+                  : 'border-border bg-white text-charcoal-300 hover:border-orange-300 hover:shadow-soft'
+              }`}
+            >
+              <span className="flex items-center justify-between gap-3">
+                {option}
+                {selected && <CheckCircle2 size={18} className="flex-shrink-0 text-green-600" />}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+/* ---------------------------- Step 4: Details ---------------------------- */
 function StepDetails({ data, update, errors }) {
   return (
     <div>
       <Heading title="Your Details" sub="We'll use these to confirm your booking." />
       <div className="mt-6 grid sm:grid-cols-2 gap-4">
         <Field label="Full Name" icon={User} value={data.name} onChange={(v) => update({ name: v })} required error={errors.name} />
+        <Field label="Email Address" icon={Mail} value={data.email} onChange={(v) => update({ email: v })} type="email" required error={errors.email} />
         <Field label="Mobile Number" icon={Phone} value={data.phone} onChange={(v) => update({ phone: v })} required error={errors.phone} placeholder="021 123 4567" />
-        <Field label="Email Address" icon={Mail} value={data.email} onChange={(v) => update({ email: v })} type="email" required error={errors.email} className="sm:col-span-2" />
-        <Field label="Group Size" icon={Users} value={data.groupSize} onChange={(v) => update({ groupSize: v.replace(/\D/g, '') || '1' })} type="number" required error={errors.groupSize} min="1" max="20" />
+        <Field label="Number of Players" icon={Users} value={data.groupSize} onChange={(v) => update({ groupSize: v.replace(/\D/g, '') || '1' })} type="number" required error={errors.groupSize} min="1" max="20" />
+        <TextArea label="Notes / Special Request" icon={MessageSquare} value={data.notes} onChange={(v) => update({ notes: v })} className="sm:col-span-2" />
       </div>
       <p className="mt-4 text-xs text-muted">All fields are required. No machine or game selection is needed.</p>
     </div>
@@ -654,20 +780,32 @@ function StepConfirm({ data, slots, update, error }) {
   const selectedPackage = totals.selectedPackage
   return (
     <div>
-      <Heading title="Review Your Booking" sub="Everything looks good? Reserve your preferred session and our team will confirm it shortly." />
+      <Heading title="Booking Summary" sub="Please review your details before confirming your booking." />
 
-      <div className="mt-6 rounded-2xl border border-orange-200 bg-white p-4 shadow-soft sm:p-5">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-orange-600">Booking Summary</div>
+      <div className="mt-6 overflow-hidden rounded-3xl border border-orange-200 bg-white shadow-soft">
+        <div className="bg-gradient-to-r from-orange-500 to-charcoal-300 px-5 py-4 text-white">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/80">Premium Reservation Summary</div>
+          <div className="mt-1 font-display text-2xl font-extrabold">{selectedPackage?.name || 'RCC Package'}</div>
+        </div>
+        <div className="p-4 sm:p-5">
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <PremiumSummaryRow icon={Calendar} label="Date" value={formatDateDisplay(data.date)} />
-          <PremiumSummaryRow icon={Clock} label="Time" value={selectedSlot?.time || '-'} />
-          <PremiumSummaryRow icon={Coffee} label="Package" value={selectedPackage ? `${selectedPackage.name} - $${totals.basePrice}` : '-'} />
-          <PremiumSummaryRow icon={Clock} label="Base Play Time" value={totals.basePlayTime || '-'} />
+          <PremiumSummaryRow icon={Clock} label="Selected Time" value={selectedSlot?.time || '-'} />
+          <PremiumSummaryRow icon={Coffee} label="Selected Package" value={selectedPackage ? `${selectedPackage.name} - ${totals.basePlayTime}` : '-'} />
           <PremiumSummaryRow icon={Clock} label="Extra Play Time" value={totals.extraPlayTime || '-'} />
           <PremiumSummaryRow icon={Clock} label="Total Play Time" value={totals.totalPlayTime || '-'} />
-          <PremiumSummaryRow icon={Coffee} label="Total Price" value={selectedPackage ? `$${totals.totalPrice}` : '-'} />
+          <PremiumSummaryRow icon={Cake} label="Selected Toastie" value={data.toastieChoice || '-'} />
+          <PremiumSummaryRow icon={Coffee} label="Selected Drink" value={data.coffeeChoice || '-'} />
+          <PremiumSummaryRow icon={Users} label="Number of Players" value={data.groupSize || '-'} />
           <PremiumSummaryRow icon={User} label="Customer Name" value={data.name} />
           <PremiumSummaryRow icon={Phone} label="Phone Number" value={data.phone} />
+          <PremiumSummaryRow icon={Gift} label="Total Price" value={selectedPackage ? `$${totals.totalPrice}` : '-'} />
+        </div>
+        {data.notes && (
+          <div className="mt-3 rounded-xl border border-border bg-bg-soft p-3 text-sm text-charcoal-300">
+            <span className="font-bold text-muted">Notes: </span>{data.notes}
+          </div>
+        )}
         </div>
       </div>
 
@@ -684,7 +822,7 @@ function StepConfirm({ data, slots, update, error }) {
           className="mt-1 h-5 w-5 flex-shrink-0 accent-orange-500"
         />
         <span className="font-medium text-charcoal-300">
-          I confirm that I will attend the selected session or inform the team in advance if I need to reschedule.
+          I confirm that all booking details are correct.
         </span>
       </label>
       {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
@@ -711,8 +849,12 @@ function SummarySidebar({ data, slots }) {
         <SidebarLine label="Extra Play" value={selectedPackage ? totals.extraPlayTime : '-'} />
         <SidebarLine label="Total Play" value={totals.totalPlayTime || '-'} />
         <SidebarLine label="Total Price" value={selectedPackage ? `$${totals.totalPrice}` : '-'} />
+        <SidebarLine label="Toastie" value={data.toastieChoice || '-'} />
+        <SidebarLine label="Drink" value={data.coffeeChoice || '-'} />
         <SidebarLine label="Slot" value={selectedSlot?.time || '-'} />
-        <SidebarLine label="Group Size" value={data.groupSize || '-'} />
+        <SidebarLine label="Players" value={data.groupSize || '-'} />
+        <SidebarLine label="Name" value={data.name || '-'} />
+        <SidebarLine label="Phone" value={data.phone || '-'} />
       </div>
       {selectedSlot && (
         <div className="mt-5 rounded-xl bg-bg-soft border border-border p-4">
@@ -760,9 +902,14 @@ function SuccessCard({ data, onReset }) {
         <div className="flex justify-between"><span className="text-muted">Package</span><span className="font-semibold text-charcoal-300">{data.packageName}</span></div>
         <div className="flex justify-between"><span className="text-muted">Base Play Time</span><span className="font-semibold text-charcoal-300">{data.basePlayTime || '-'}</span></div>
         <div className="flex justify-between"><span className="text-muted">Extra Play Time</span><span className="font-semibold text-charcoal-300">{data.extraPlayTime || '-'}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Total Price</span><span className="font-semibold text-charcoal-300">${data.totalPrice ?? data.packagePrice}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Group Size</span><span className="font-semibold text-charcoal-300">{data.groupSize}</span></div>
         <div className="flex justify-between"><span className="text-muted">Total Play Time</span><span className="font-semibold text-charcoal-300">{data.totalPlayTime || data.playTime}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Toastie</span><span className="font-semibold text-charcoal-300">{data.toastieSelection || data.toastieChoice || '-'}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Drink</span><span className="font-semibold text-charcoal-300">{data.drinkSelection || data.coffeeChoice || '-'}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Group Size</span><span className="font-semibold text-charcoal-300">{data.groupSize}</span></div>
+        <div className="flex justify-between"><span className="text-muted">Total Price</span><span className="font-semibold text-charcoal-300">${data.totalPrice ?? data.packagePrice}</span></div>
+        <div className="rounded-lg bg-white px-3 py-2 text-sm text-charcoal-300">
+          <span className="font-bold text-orange-700">Your food & drink selection:</span> Our team will prepare your selected items before your visit.
+        </div>
       </div>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <Link to="/" className="btn-primary">Return to Home</Link>
@@ -801,6 +948,28 @@ function Field({ label, icon: Icon, value, onChange, type = 'text', required, er
         max={max}
         onChange={(e) => onChange(e.target.value)} 
         className={`field-input ${error ? 'border-red-300 focus:border-red-500' : ''}`}
+      />
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+function TextArea({ label, icon: Icon, value, onChange, error, className = '', placeholder = 'Anything we should know before your visit?' }) {
+  const generatedId = useId()
+  const inputId = `booking-${generatedId}`
+
+  return (
+    <div className={className}>
+      <label htmlFor={inputId} className="field-label flex items-center gap-1.5">
+        {Icon && <Icon size={12} />}{label}
+      </label>
+      <textarea
+        id={inputId}
+        value={value}
+        placeholder={placeholder}
+        rows={4}
+        onChange={(e) => onChange(e.target.value)}
+        className={`field-input min-h-[116px] resize-y ${error ? 'border-red-300 focus:border-red-500' : ''}`}
       />
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>

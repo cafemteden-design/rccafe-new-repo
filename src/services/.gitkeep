@@ -1,0 +1,2 @@
+# Reserved for data-access service modules (e.g. rewardCardsService.js).
+# These will wrap Supabase queries for the upcoming reward backend.

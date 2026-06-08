@@ -1,230 +1,225 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Play, Volume2, VolumeX, X, Heart, Truck, MapPin } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { ChevronLeft, ChevronRight, Instagram, Play, RadioTower, Volume2, VolumeX } from 'lucide-react'
 import { ARENA_VIDEOS } from '../data/videos.js'
+import { SITE } from '../data/site.js'
 
-const TRUST_CHIPS = [
-  { icon: Play, label: 'Real Customer Videos' },
-  { icon: Heart, label: 'Family Friendly' },
-  { icon: Truck, label: 'RC Construction Arena' },
-  { icon: MapPin, label: 'Auckland Experience' }
-]
+const ROTATE_MS = 3800
 
 export default function VideoRail() {
+  const sectionRef = useRef(null)
   const railRef = useRef(null)
-  const [lightbox, setLightbox] = useState(null) // index or null
-  const [paused, setPaused] = useState(false)
-  const pauseTimerRef = useRef(null)
+  const videoRefs = useRef([])
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [isVisible, setIsVisible] = useState(false)
+  const [userLocked, setUserLocked] = useState(false)
+  const [soundIndex, setSoundIndex] = useState(null)
 
-  const scroll = (dir) => {
-    const el = railRef.current
-    if (!el) return
-    const card = el.querySelector('[data-vcard]')
-    const step = card ? card.clientWidth + 20 : 320
-    const max = el.scrollWidth - el.clientWidth
-    let next = el.scrollLeft + dir * step
-    // Loop back to start when we reach the end
-    if (dir > 0 && el.scrollLeft >= max - 4) next = 0
-    if (dir < 0 && el.scrollLeft <= 4) next = max
-    el.scrollTo({ left: next, behavior: 'smooth' })
+  const selectVideo = (index, lock = false) => {
+    setActiveIndex(index)
+    if (lock) setUserLocked(true)
+    scrollToCard(index)
   }
 
-  // Pause auto-slide briefly on user interaction
-  const nudgePause = () => {
-    setPaused(true)
-    if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current)
-    pauseTimerRef.current = setTimeout(() => setPaused(false), 4000)
+  const scrollToCard = (index) => {
+    const rail = railRef.current
+    const card = rail?.querySelector(`[data-video-card="${index}"]`)
+    if (!rail || !card) return
+    const left = card.offsetLeft - rail.offsetLeft
+    rail.scrollTo({ left, behavior: 'smooth' })
   }
 
-  // Auto-slide every 2.8s while the rail is on screen, lightbox is closed and not paused
+  const move = (direction) => {
+    const next = (activeIndex + direction + ARENA_VIDEOS.length) % ARENA_VIDEOS.length
+    selectVideo(next, true)
+  }
+
+  const toggleSound = (index) => {
+    setSoundIndex((current) => current === index ? null : index)
+    selectVideo(index, true)
+  }
+
   useEffect(() => {
-    const el = railRef.current
-    if (!el) return
-    let inView = false
-    const io = new IntersectionObserver(([e]) => { inView = e.isIntersecting }, { threshold: 0.25 })
-    io.observe(el)
-    const id = setInterval(() => {
-      if (!inView || paused || lightbox !== null) return
-      if (document.hidden) return
-      scroll(1)
-    }, 2800)
-    // Manual swipe / drag pauses briefly
-    const onUserMove = () => nudgePause()
-    el.addEventListener('pointerdown', onUserMove)
-    el.addEventListener('wheel', onUserMove, { passive: true })
-    el.addEventListener('touchstart', onUserMove, { passive: true })
-    return () => {
-      io.disconnect()
-      clearInterval(id)
-      el.removeEventListener('pointerdown', onUserMove)
-      el.removeEventListener('wheel', onUserMove)
-      el.removeEventListener('touchstart', onUserMove)
+    const section = sectionRef.current
+    if (!section) return
+
+    const updateVisibility = () => {
+      const rect = section.getBoundingClientRect()
+      const visible = rect.top < window.innerHeight * 0.85 && rect.bottom > window.innerHeight * 0.15
+      setIsVisible(visible)
     }
-  }, [paused, lightbox])
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { threshold: 0.18, rootMargin: '120px 0px' }
+    )
+
+    observer.observe(section)
+    updateVisibility()
+    window.addEventListener('scroll', updateVisibility, { passive: true })
+    window.addEventListener('resize', updateVisibility)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', updateVisibility)
+      window.removeEventListener('resize', updateVisibility)
+    }
+  }, [])
+
+  useEffect(() => {
+    videoRefs.current.forEach((video, index) => {
+      if (!video) return
+
+      if (!isVisible || index !== activeIndex) {
+        video.pause()
+        if (index !== activeIndex) video.currentTime = 0
+        return
+      }
+
+      video.muted = soundIndex !== index
+      if (video.readyState === 0) video.load()
+      video.play().catch(() => {})
+    })
+  }, [activeIndex, isVisible, soundIndex])
+
+  useEffect(() => {
+    if (!isVisible || userLocked) return undefined
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => {
+        const next = (current + 1) % ARENA_VIDEOS.length
+        window.requestAnimationFrame(() => scrollToCard(next))
+        return next
+      })
+    }, ROTATE_MS)
+
+    return () => window.clearInterval(timer)
+  }, [isVisible, userLocked])
+
+  useEffect(() => {
+    if (soundIndex === null) return undefined
+
+    const timer = window.setTimeout(() => {
+      setUserLocked(false)
+      setSoundIndex(null)
+    }, 15000)
+
+    return () => window.clearTimeout(timer)
+  }, [soundIndex])
 
   return (
-    <section className="section-light py-14 sm:py-20 overflow-hidden" id="videos">
+    <section ref={sectionRef} className="section-light py-10 sm:py-14 overflow-hidden" id="videos">
       <div className="container-x">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
-            <span className="eyebrow"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" />Real Footage</span>
-            <h2 className="heading-display mt-4">See RC Cafe <span className="accent">In Action</span></h2>
-            <p className="mt-4 text-muted text-base sm:text-lg">Real visitors. Real machines. Real fun.</p>
+            <span className="eyebrow"><RadioTower size={14} />Live from RCC</span>
+            <h2 className="mt-3 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-4xl">RCC <span className="text-orange-500">Moments</span></h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted sm:text-base">Watch the action, machines, and cafe experience.</p>
           </div>
-          <div className="hidden md:flex items-center gap-2">
-            <button onClick={() => scroll(-1)} aria-label="Previous video" className="grid place-items-center w-11 h-11 rounded-full border border-border bg-white text-charcoal-300 hover:border-orange-500 hover:text-orange-600 transition"><ChevronLeft size={20} /></button>
-            <button onClick={() => scroll(1)} aria-label="Next video" className="grid place-items-center w-11 h-11 rounded-full border border-border bg-white text-charcoal-300 hover:border-orange-500 hover:text-orange-600 transition"><ChevronRight size={20} /></button>
+
+          <div className="flex items-center gap-2">
+            <button onClick={() => move(-1)} aria-label="Previous video" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-white text-charcoal-300 transition hover:border-orange-500 hover:text-orange-600">
+              <ChevronLeft size={18} />
+            </button>
+            <button onClick={() => move(1)} aria-label="Next video" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-white text-charcoal-300 transition hover:border-orange-500 hover:text-orange-600">
+              <ChevronRight size={18} />
+            </button>
+            <a href={SITE.socials.instagram} target="_blank" rel="noreferrer" className="btn-outline !py-2.5">
+              <Instagram size={16} /> Follow on Instagram
+            </a>
           </div>
         </div>
 
-        <div className="mt-10 max-w-full overflow-hidden">
+        <div className="mt-7">
           <div
             ref={railRef}
-            className="flex gap-4 sm:gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth px-4 sm:px-0 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="flex touch-pan-x touch-pan-y snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
-            {ARENA_VIDEOS.map((v, i) => (
-              <VideoCard key={v.video} item={v} index={i} onExpand={() => setLightbox(i)} />
+            {ARENA_VIDEOS.map((item, index) => (
+              <VideoCard
+                key={item.video}
+                item={item}
+                index={index}
+                active={activeIndex === index}
+                muted={soundIndex !== index}
+                setRef={(element) => { videoRefs.current[index] = element }}
+                onSelect={() => selectVideo(index, true)}
+                onToggleSound={() => toggleSound(index)}
+              />
             ))}
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
-          {TRUST_CHIPS.map((c) => (
-            <span key={c.label} className="chip">
-              <c.icon size={14} className="text-orange-500" />
-              {c.label}
-            </span>
+        <div className="mt-4 flex items-center justify-center gap-2">
+          {ARENA_VIDEOS.map((item, index) => (
+            <button
+              key={item.video}
+              onClick={() => selectVideo(index, true)}
+              aria-label={`Show video ${index + 1}`}
+              className={`h-2 rounded-full transition-all ${activeIndex === index ? 'w-8 bg-orange-500' : 'w-2 bg-orange-200 hover:bg-orange-300'}`}
+            />
           ))}
         </div>
       </div>
-
-      <AnimatePresence>
-        {lightbox !== null && (
-          <Lightbox item={ARENA_VIDEOS[lightbox]} onClose={() => setLightbox(null)} />
-        )}
-      </AnimatePresence>
     </section>
   )
 }
 
-/* ------------------------------ Video card ----------------------------- */
-function VideoCard({ item, index, onExpand }) {
-  const videoRef = useRef(null)
-  const [muted, setMuted] = useState(true)
-  const [shouldLoad, setShouldLoad] = useState(false)
-
-  useEffect(() => {
-    const el = videoRef.current
-    if (!el) return
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setShouldLoad(true)
-          el.play().catch(() => {})
-        } else {
-          el.pause()
-        }
-      },
-      { threshold: 0.35, rootMargin: '200px' }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [])
-
+function VideoCard({ item, index, active, muted, setRef, onSelect, onToggleSound }) {
   return (
-    <motion.div
-      data-vcard
-      initial={{ opacity: 0, y: 18 }}
+    <motion.article
+      data-video-card={index}
+      initial={{ opacity: 0, y: 14 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ delay: index * 0.06 }}
-      className="snap-start shrink-0 w-[78%] xs:w-[72%] sm:w-[52%] md:w-[42%] lg:w-[31%]"
+      transition={{ delay: index * 0.04 }}
+      className="shrink-0 snap-start w-[82%] sm:w-[46%] lg:w-[31%]"
     >
-      <div className="group relative rounded-2xl overflow-hidden border-2 border-orange-200 bg-white shadow-soft hover:shadow-glow hover:border-orange-400 transition-all">
-        <div className="relative aspect-[9/16] bg-bg-soft overflow-hidden">
+      <div className={`relative overflow-hidden rounded-3xl border bg-white shadow-soft transition-all duration-300 ${active ? 'border-orange-400 shadow-glow' : 'border-orange-100 hover:border-orange-300 hover:shadow-card'}`}>
+        <div className="relative aspect-[4/5] overflow-hidden bg-bg-soft">
           <video
-            ref={videoRef}
-            src={shouldLoad ? item.video : undefined}
+            ref={setRef}
+            src={item.video}
             muted={muted}
-            loop
             playsInline
-            autoPlay
-            preload="metadata"
-            className="absolute inset-0 h-full w-full object-cover bg-bg-soft"
+            preload={index === 0 ? 'metadata' : 'none'}
+            autoPlay={active}
+            controls={false}
+            draggable={false}
+            disablePictureInPicture
+            className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
           />
-          {/* Top badge */}
-          <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500 text-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest shadow-glow">
-            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-            Real Customer Footage
+
+          <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-glow">
+            <span className={`h-1.5 w-1.5 rounded-full bg-white ${active ? 'animate-pulse' : ''}`} />
+            {active ? 'Playing' : 'RCC Moment'}
           </div>
-          {/* Mute toggle */}
+
           <button
-            onClick={() => setMuted((m) => !m)}
-            aria-label={muted ? 'Unmute' : 'Mute'}
-            className="absolute top-3 right-3 grid place-items-center w-9 h-9 rounded-full bg-white/90 text-charcoal-300 backdrop-blur hover:bg-orange-500 hover:text-white transition"
+            type="button"
+            onClick={(event) => { event.stopPropagation(); onToggleSound() }}
+            aria-label={muted ? 'Unmute video' : 'Mute video'}
+            className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-charcoal-300 shadow-soft backdrop-blur transition hover:bg-orange-500 hover:text-white"
           >
-            {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
           </button>
-          {/* Expand */}
+
           <button
-            onClick={onExpand}
-            aria-label="Open large player"
-            className="absolute inset-0 grid place-items-center bg-charcoal-300/0 hover:bg-charcoal-300/30 transition"
+            type="button"
+            onClick={onSelect}
+            aria-label={`Play ${item.title}`}
+            className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-2xl bg-white/92 px-3 py-2 text-left shadow-soft backdrop-blur transition hover:bg-white"
           >
-            <span className="opacity-0 group-hover:opacity-100 transition grid place-items-center w-14 h-14 rounded-full bg-orange-500 text-white shadow-glow">
-              <Play size={22} fill="currentColor" />
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-orange-600">{item.tag}</div>
+              <div className="mt-0.5 text-sm font-extrabold text-charcoal-300">{item.title}</div>
+            </div>
+            <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-orange-500 text-white">
+              <Play size={16} fill="currentColor" />
             </span>
           </button>
         </div>
-        <div className="p-4">
-          <div className="text-[10px] uppercase tracking-widest text-orange-600 font-bold">{item.tag}</div>
-          <div className="mt-1 font-display text-lg font-extrabold text-charcoal-300">{item.title}</div>
-        </div>
       </div>
-    </motion.div>
-  )
-}
-
-/* ------------------------------ Lightbox ------------------------------- */
-function Lightbox({ item, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 z-[100] bg-charcoal-300/90 backdrop-blur flex items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.94, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.94, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md"
-      >
-        <button onClick={onClose} aria-label="Close" className="absolute -top-12 right-0 grid place-items-center w-10 h-10 rounded-full bg-white text-charcoal-300 hover:bg-orange-500 hover:text-white transition">
-          <X size={20} />
-        </button>
-        <div className="rounded-2xl overflow-hidden border-2 border-orange-400 bg-black shadow-glow">
-          <video
-            src={item.video}
-            controls
-            autoPlay
-            playsInline
-            className="w-full aspect-[9/16] object-contain bg-black"
-          />
-        </div>
-        <div className="mt-3 text-center">
-          <div className="text-[10px] uppercase tracking-widest text-orange-300 font-bold">{item.tag}</div>
-          <div className="mt-1 text-white font-display font-extrabold">{item.title}</div>
-        </div>
-      </motion.div>
-    </motion.div>
+    </motion.article>
   )
 }

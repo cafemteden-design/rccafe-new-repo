@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Instagram, Facebook, Youtube, Phone, MapPin, Clock } from 'lucide-react'
+import { Instagram, Facebook, Youtube, Phone, MapPin, Clock, Gift, MessageCircle } from 'lucide-react'
 import { SITE, NAV } from '../data/site.js'
 import Logo from './Logo.jsx'
 
@@ -24,6 +24,7 @@ export default function Footer() {
             families, kids and groups to drive real RC construction machines.
           </p>
           <div className="mt-5 flex items-center gap-3">
+            <a href={SITE.socials.whatsapp} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 hover:border-orange-500 hover:text-orange-600 transition"><MessageCircle size={18} /></a>
             <a href={SITE.socials.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 hover:border-orange-500 hover:text-orange-600 transition"><Instagram size={18} /></a>
             <a href={SITE.socials.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 hover:border-orange-500 hover:text-orange-600 transition"><Facebook size={18} /></a>
             <a href={SITE.socials.tiktok} target="_blank" rel="noreferrer" aria-label="TikTok" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 hover:border-orange-500 hover:text-orange-600 transition"><TikTokIcon className="h-[18px] w-[18px]" /></a>
@@ -51,7 +52,10 @@ export default function Footer() {
             <li className="flex items-start gap-3 text-charcoal-100"><MapPin size={18} className="mt-0.5 text-orange-600" /> {SITE.location}</li>
             <li className="flex items-start gap-3 text-charcoal-100"><Clock size={18} className="mt-0.5 text-orange-600" /> {SITE.hours}</li>
           </ul>
-          <Link to="/booking#calendar" className="btn-primary mt-6">Book Your Session</Link>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
+            <Link to="/booking#calendar" className="btn-primary">Book Your Session</Link>
+            <Link to="/rewards" className="btn-outline"><Gift size={16} /> RCC Reward Card</Link>
+          </div>
         </div>
       </div>
 

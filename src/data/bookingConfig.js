@@ -55,17 +55,27 @@ export async function fetchSlotAvailability(date) {
 
   const url = new URL(BOOKING_API_URL)
   url.searchParams.set('date', formatDateKey(date))
+  url.searchParams.set('bookingDate', formatDateKey(date))
+
+  debugBooking('availability request', { url: url.toString() })
 
   const response = await fetch(url.toString(), {
     method: 'GET',
     headers: { Accept: 'application/json' }
   })
 
+  const result = await parseJsonResponse(response)
+  debugBooking('availability response', {
+    ok: response.ok,
+    status: response.status,
+    bodyType: Array.isArray(result) ? 'array' : typeof result
+  })
+
   if (!response.ok) {
     throw new Error('Unable to load slot availability.')
   }
 
-  return parseJsonResponse(response)
+  return result
 }
 
 export async function submitBooking(booking) {
@@ -77,23 +87,38 @@ export async function submitBooking(booking) {
   }
 
   const payload = normalizeBookingPayload(booking)
+  debugBooking('submit payload', redactBookingForLog(payload))
 
   const response = await fetch(BOOKING_API_URL, {
     method: 'POST',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'text/plain;charset=utf-8'
+    },
     body: JSON.stringify(payload)
+  })
+
+  const result = await parseJsonResponse(response)
+  debugBooking('submit response', {
+    ok: response.ok,
+    status: response.status,
+    resultStatus: result?.status || result?.result || result?.success,
+    message: result?.message || result?.error || ''
   })
 
   if (!response.ok) {
     throw new Error('Unable to submit booking request.')
   }
 
-  return parseJsonResponse(response)
+  return result
 }
 
 function normalizeBookingPayload(booking) {
+  const name = String(booking?.name || booking?.customerName || '').trim()
+  const email = String(booking?.email || booking?.customerEmail || '').trim()
   const phone = String(booking?.phone || booking?.customerPhone || booking?.userPhone || '').trim()
-  const slotTime = String(booking?.slotTime || booking?.slot || booking?.time || '').trim()
+  const date = String(booking?.date || booking?.bookingDate || '').trim()
+  const slotTime = String(booking?.slotTime || booking?.bookingTime || booking?.slot || booking?.time || '').trim()
   const bookingStatus = String(booking?.bookingStatus || booking?.adminStatus || booking?.status || 'Pending Confirmation').trim()
   const packageName = String(booking?.packageName || booking?.package || '').trim()
   const baseDuration = Number(booking?.baseDuration || booking?.packageDuration || 0)
@@ -103,15 +128,28 @@ function normalizeBookingPayload(booking) {
   const upgradePrice = Number(booking?.upgradePrice || 0)
   const totalPrice = Number(booking?.totalPrice || booking?.packagePrice || booking?.price || 0)
   const upgradeSelected = String(booking?.upgradeSelected || booking?.upgradeName || 'No Extra Time').trim()
+  const toastieSelection = String(booking?.toastieSelection || booking?.toastieChoice || '').trim()
+  const drinkSelection = String(booking?.drinkSelection || booking?.coffeeChoice || '').trim()
+  const notificationEmails = Array.isArray(booking?.notificationEmails)
+    ? booking.notificationEmails
+    : String(booking?.notificationEmail || booking?.emailRecipients || booking?.adminEmails || '').split(',').map((email) => email.trim()).filter(Boolean)
+  const emailRecipients = notificationEmails.join(',')
 
   return {
     ...booking,
+    name,
+    customerName: name,
+    email,
+    customerEmail: email,
     phone,
     customerPhone: phone,
     userPhone: phone,
     mobile: phone,
     mobileNumber: phone,
+    date,
+    bookingDate: date,
     slotTime,
+    bookingTime: slotTime,
     slot: slotTime,
     time: slotTime,
     bookingStatus,
@@ -121,6 +159,7 @@ function normalizeBookingPayload(booking) {
     package: packageName,
     baseDuration,
     packageDuration: baseDuration,
+    packageDurationMinutes: baseDuration,
     upgradeSelected,
     upgradeName: upgradeSelected,
     extraDuration,
@@ -131,7 +170,18 @@ function normalizeBookingPayload(booking) {
     upgradePrice,
     totalPrice,
     packagePrice: totalPrice,
-    price: totalPrice
+    price: totalPrice,
+    players: Number(booking?.players || booking?.groupSize || 0),
+    numberOfPlayers: Number(booking?.players || booking?.groupSize || 0),
+    source: booking?.source || 'website',
+    toastieSelection,
+    toastieChoice: toastieSelection,
+    drinkSelection,
+    coffeeChoice: drinkSelection,
+    notificationEmails,
+    notificationEmail: emailRecipients,
+    emailRecipients,
+    adminEmails: emailRecipients
   }
 }
 
@@ -141,7 +191,26 @@ async function parseJsonResponse(response) {
   try {
     return JSON.parse(text)
   } catch {
-    throw new Error('Unexpected API response.')
+    const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 180)
+    throw new Error(`Unexpected API response: ${snippet || 'empty response'}`)
+  }
+}
+
+function debugBooking(label, data) {
+  if (import.meta.env.DEV) {
+    console.info(`[booking] ${label}`, data)
+  }
+}
+
+function redactBookingForLog(payload) {
+  return {
+    ...payload,
+    email: payload.email ? '[redacted-email]' : '',
+    customerEmail: payload.customerEmail ? '[redacted-email]' : '',
+    phone: payload.phone ? '[redacted-phone]' : '',
+    customerPhone: payload.customerPhone ? '[redacted-phone]' : '',
+    mobile: payload.mobile ? '[redacted-phone]' : '',
+    mobileNumber: payload.mobileNumber ? '[redacted-phone]' : ''
   }
 }
 
@@ -316,8 +385,16 @@ export function validateBookingData(data) {
     errors.slotIndex = 'Please select a slot time'
   }
 
+  if (!data.toastieChoice && !data.toastieSelection) {
+    errors.toastieChoice = 'Please select a toastie'
+  }
+
+  if (!data.coffeeChoice && !data.drinkSelection) {
+    errors.coffeeChoice = 'Please select a drink'
+  }
+
   if (!data.confirmAttendance) {
-    errors.confirmAttendance = 'Please confirm your attendance before reserving your slot'
+    errors.confirmAttendance = 'Please confirm that all booking details are correct'
   }
 
   return {

@@ -8,6 +8,7 @@ import {
 import SectionHeading from '../components/SectionHeading.jsx'
 import MachineCard from '../components/MachineCard.jsx'
 import VideoRail from '../components/VideoRail.jsx'
+import { RewardCardBack, RewardCardFront } from '../components/rewards/RewardCardDisplay.jsx'
 import { MACHINES } from '../data/machines.js'
 import { PRICING, SITE } from '../data/site.js'
 import { GALLERY } from '../data/gallery.js'
@@ -37,6 +38,32 @@ const FAQS = [
   { q: 'What happens if a toy is damaged?', a: 'Please return all RC toys to staff after your session. Any damage caused by misuse may be charged at repair or replacement cost.' }
 ]
 
+const REWARD_PREVIEW_CARD = {
+  cardId: 'RCC-1001',
+  token: 'home-preview',
+  name: 'RCC Guest',
+  phone: '09 558 7570',
+  stampCount: 3,
+  cycle: 1,
+  rewardStatus: 'collecting',
+  lastStampDate: '',
+  history: []
+}
+
+const REWARD_POINTS = [
+  { icon: Gift, label: 'Free digital card' },
+  { icon: Truck, label: '1 visit = 1 stamp' },
+  { icon: Sparkles, label: '7 stamps = surprise gift' },
+  { icon: ShieldCheck, label: 'No physical card required' }
+]
+
+const REWARD_STEPS = [
+  'Register once',
+  'Save your digital card link',
+  'Show card at RCC counter',
+  'Staff adds your stamp'
+]
+
 export default function Home() {
   return (
     <>
@@ -46,6 +73,7 @@ export default function Home() {
         <VideoRail />
       </div>
       <AboutExperience />
+      <RewardsSection />
       <MachinesSection />
       <PricingSection />
       <CorporateSection />
@@ -54,6 +82,76 @@ export default function Home() {
       <FAQSection />
       <FinalCTA />
     </>
+  )
+}
+
+function RewardsSection() {
+  return (
+    <section id="rewards-preview" className="section-light py-8 sm:py-10">
+      <div className="container-x">
+        <div className="relative overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-br from-white via-[#fffaf3] to-white p-5 shadow-soft sm:p-6 lg:p-7">
+          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-orange-500 via-orange-300 to-charcoal-300" />
+          <div className="relative grid gap-7 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+            <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+              <span className="eyebrow"><Gift size={14} />RCC Rewards</span>
+              <h2 className="mt-3 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-[38px]">RCC Digital <span className="text-orange-500">Reward Card</span></h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
+                Register once, collect stamps on every visit, and unlock a surprise gift after 7 visits.
+              </p>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {REWARD_POINTS.map((point) => (
+                  <div key={point.label} className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-white px-3 py-2.5 shadow-sm">
+                    <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-600">
+                      <point.icon size={18} />
+                    </div>
+                    <div className="text-sm font-extrabold text-charcoal-300">{point.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {REWARD_STEPS.map((step, index) => (
+                  <div key={step} className="flex items-center gap-2 text-sm font-semibold text-charcoal-100">
+                    <span className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-charcoal-300 text-[10px] font-extrabold text-white">{index + 1}</span>
+                    {step}
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-4 rounded-2xl border border-orange-100 bg-white px-4 py-3 text-sm font-semibold text-charcoal-300">
+                Customers can open their card anytime from the saved link or WhatsApp message.
+              </p>
+
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <Link to="/rewards" className="btn-primary">Create My Card <ArrowRight size={16} /></Link>
+                <Link to="/rewards/card/demo" className="btn-outline">View Demo</Link>
+              </div>
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.08 }} className="min-w-0">
+              <div className="mx-auto grid w-full max-w-md gap-4 sm:gap-5">
+                <RewardCardFront card={REWARD_PREVIEW_CARD} compact />
+                <RewardCardBack card={REWARD_PREVIEW_CARD} compact />
+              </div>
+              <div className="mx-auto mt-3 max-w-md rounded-2xl border border-orange-100 bg-white px-4 py-2.5 text-center text-sm font-semibold text-charcoal-300">
+                Demo progress: 3 of 7 stamps collected
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function CompactSectionHeading({ eyebrow, title, subtitle }) {
+  return (
+    <div className="mx-auto max-w-2xl text-center">
+      {eyebrow && <span className="eyebrow"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" />{eyebrow}</span>}
+      <h2 className="mt-3 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-4xl">{title}</h2>
+      {subtitle && <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">{subtitle}</p>}
+    </div>
   )
 }
 
@@ -158,13 +256,13 @@ function AboutExperience() {
 
 function MachinesSection() {
   return (
-    <section className="section-soft py-14 sm:py-20">
+    <section className="section-soft py-10 sm:py-14">
       <div className="container-x">
-        <SectionHeading eyebrow="The Fleet" title={<>Machines You Can <span className="accent">Control</span></>} subtitle="Five different RC construction machine types ready for hands-on arena play." />
-        <div className="mt-10 sm:mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {MACHINES.map((m, i) => <MachineCard m={m} key={m.id} index={i} />)}
+        <CompactSectionHeading eyebrow="The Fleet" title={<>RC Machines & <span className="text-orange-500">Games</span></>} subtitle="Hands-on construction machines ready for supervised arena play." />
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {MACHINES.map((m, i) => <MachineCard m={m} key={m.id} index={i} compact />)}
         </div>
-        <div className="mt-10 text-center"><Link to="/machines" className="btn-outline">View All Machines <ArrowRight size={16} /></Link></div>
+        <div className="mt-7 text-center"><Link to="/machines" className="btn-outline">View RC Machines <ArrowRight size={16} /></Link></div>
       </div>
     </section>
   )
@@ -172,25 +270,25 @@ function MachinesSection() {
 
 function PricingSection() {
   return (
-    <section className="section-light py-14 sm:py-20">
+    <section className="section-light py-10 sm:py-14">
       <div className="container-x">
-        <SectionHeading eyebrow="RC + Food Garage" title={<>Package <span className="accent">Pricing</span></>} subtitle="Choose a play package with any toastie and any hot coffee." />
-        <div className="mt-10 sm:mt-12 grid md:grid-cols-3 gap-5">
+        <CompactSectionHeading eyebrow="RC + Food Garage" title={<>Package <span className="text-orange-500">Pricing</span></>} subtitle="Pick a compact play package with cafe inclusions." />
+        <div className="mt-7 grid gap-4 md:grid-cols-3">
           {PRICING.map((p, i) => {
             const featured = p.id === 'power'
             return (
-              <motion.div key={p.id} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }} className={`relative rounded-2xl border p-7 transition ${featured ? 'border-orange-500 bg-orange-50 shadow-glow' : 'border-border bg-white shadow-soft hover:shadow-card'}`}>
+              <motion.div key={p.id} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }} className={`relative rounded-2xl border p-5 transition sm:p-6 ${featured ? 'border-orange-500 bg-orange-50 shadow-glow' : 'border-border bg-white shadow-soft hover:shadow-card'}`}>
                 {featured && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-orange-500 text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest">Most Popular</div>}
                 <div className="text-xs uppercase tracking-widest font-bold text-orange-600">{p.label}</div>
-                <div className="mt-3 flex items-end gap-1">
-                  <span className="font-display text-5xl font-extrabold text-charcoal-300">${p.price}</span>
+                <div className="mt-2 flex items-end gap-1">
+                  <span className="font-display text-4xl font-extrabold text-charcoal-300">${p.price}</span>
                   <span className="mb-1.5 text-sm text-muted">{p.unit}</span>
                 </div>
-                <ul className="mt-5 space-y-2 text-sm text-charcoal-100">
-                  {p.perks.map((x) => <li key={x} className="flex items-start gap-2"><span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-orange-500" /> {x}</li>)}
+                <ul className="mt-4 space-y-1.5 text-sm text-charcoal-100">
+                  {p.perks.slice(0, 2).map((x) => <li key={x} className="flex items-start gap-2"><span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-orange-500" /> {x}</li>)}
                 </ul>
-                <Link to={`/booking?package=${encodeURIComponent(p.label)}#calendar`} className={`mt-6 inline-flex w-full items-center justify-center rounded-full py-3 text-sm font-bold transition ${featured ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-charcoal-300 text-white hover:bg-charcoal-100'}`}>
-                  Book Package <ArrowRight size={14} className="ml-2" />
+                <Link to={`/booking?package=${encodeURIComponent(p.label)}#calendar`} className={`mt-5 inline-flex w-full items-center justify-center rounded-full py-3 text-sm font-bold transition ${featured ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-charcoal-300 text-white hover:bg-charcoal-100'}`}>
+                  Book Now <ArrowRight size={14} className="ml-2" />
                 </Link>
               </motion.div>
             )
@@ -203,11 +301,11 @@ function PricingSection() {
 
 function CorporateSection() {
   return (
-    <section className="section-soft py-14 sm:py-20">
+    <section className="section-soft py-10 sm:py-14">
       <div className="container-x grid gap-8 lg:grid-cols-2 lg:items-center">
         <div>
           <span className="eyebrow"><Building2 size={14} />Corporate Bookings</span>
-          <h2 className="heading-display mt-4">Events, Parties & <span className="accent">Free Venue Hire</span></h2>
+          <h2 className="mt-4 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-4xl">Events, Parties & <span className="text-orange-500">Free Venue Hire</span></h2>
           <p className="mt-4 text-muted leading-relaxed">
             Plan corporate events, birthday parties, school visits, group bookings and special functions with RC play and food packages.
           </p>
@@ -217,7 +315,7 @@ function CorporateSection() {
           </div>
         </div>
         <div className="rounded-2xl overflow-hidden border border-border bg-white shadow-soft">
-          <img src="/images/birthday-party.jpg" alt="RC Cafe event booking" className="h-80 w-full object-cover" />
+          <img src="/images/birthday-party.jpg" alt="RC Cafe event booking" className="h-64 w-full object-cover sm:h-72" />
         </div>
       </div>
     </section>
@@ -227,13 +325,13 @@ function CorporateSection() {
 function GalleryPreview() {
   const items = GALLERY.slice(0, 6)
   return (
-    <section className="section-light py-14 sm:py-20">
+    <section className="section-light py-10 sm:py-14">
       <div className="container-x">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <SectionHeading align="left" eyebrow="Inside The Arena" title={<>A Glimpse Into <span className="accent">RC Cafe</span></>} subtitle="Real moments from our arena, machines and cafe." />
           <Link to="/gallery" className="btn-outline self-start md:self-auto">View Gallery <ArrowRight size={16} /></Link>
         </div>
-        <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 [grid-auto-rows:160px] sm:[grid-auto-rows:200px]">
+        <div className="mt-7 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 [grid-auto-rows:130px] sm:[grid-auto-rows:170px]">
           {items.map((g, i) => (
             <motion.div key={g.id} initial={{ opacity: 0, scale: 0.97 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ delay: i * 0.05 }} className={`relative overflow-hidden rounded-2xl border border-border bg-white shadow-soft group ${i === 0 ? 'col-span-2 row-span-2' : i === 3 ? 'row-span-2' : ''}`}>
               <img src={g.src} alt={g.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
@@ -248,14 +346,14 @@ function GalleryPreview() {
 
 function GroupsSection() {
   return (
-    <section className="section-light py-14 sm:py-20">
+    <section className="section-light py-10 sm:py-14">
       <div className="container-x">
-        <SectionHeading eyebrow="Groups & Parties" title={<>Perfect for Groups, Kids & <span className="accent">Celebrations</span></>} subtitle="From birthdays to school visits, we host exciting RC arena experiences in Auckland." />
-        <div className="mt-10 sm:mt-12 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <CompactSectionHeading eyebrow="Groups & Parties" title={<>Groups, Kids & <span className="text-orange-500">Celebrations</span></>} subtitle="Birthdays, school visits and group experiences in Auckland." />
+        <div className="mt-7 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {GROUPS.map((g, i) => (
             <motion.div key={g.title} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05 }} whileHover={{ y: -4 }} className="card card-hover p-6">
-              <div className="grid place-items-center w-12 h-12 rounded-xl bg-orange-100 text-orange-600"><g.icon size={20} /></div>
-              <div className="font-display text-xl font-extrabold mt-4 text-charcoal-300">{g.title}</div>
+              <div className="grid place-items-center w-10 h-10 rounded-xl bg-orange-100 text-orange-600"><g.icon size={18} /></div>
+              <div className="font-display text-lg font-extrabold mt-3 text-charcoal-300">{g.title}</div>
               <p className="mt-1.5 text-sm text-muted">{g.desc}</p>
             </motion.div>
           ))}
@@ -268,7 +366,7 @@ function GroupsSection() {
 function FAQSection() {
   const [open, setOpen] = useState(0)
   return (
-    <section className="section-soft py-14 sm:py-20">
+    <section className="section-soft py-10 sm:py-14">
       <div className="container-x grid lg:grid-cols-12 gap-10">
         <div className="lg:col-span-5">
           <SectionHeading align="left" eyebrow="FAQ" title={<>Got <span className="accent">Questions?</span></>} subtitle="Everything you need to know before you book and play at RC Cafe Auckland." />
@@ -297,13 +395,13 @@ function FAQSection() {
 
 function FinalCTA() {
   return (
-    <section id="booking" className="relative section-light py-14 sm:py-20 overflow-hidden">
+    <section id="booking" className="relative section-light py-10 sm:py-14 overflow-hidden">
       <div className="container-x">
-        <div className="relative rounded-3xl border border-border bg-bg-soft p-10 lg:p-14 overflow-hidden">
+        <div className="relative rounded-3xl border border-border bg-bg-soft p-6 sm:p-8 lg:p-10 overflow-hidden">
           <div className="relative grid lg:grid-cols-2 gap-8 items-center">
             <div>
               <span className="eyebrow"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" />Ready When You Are</span>
-              <h2 className="heading-display mt-4">Ready to Build Your Own Mini <span className="accent">Construction Site?</span></h2>
+              <h2 className="mt-4 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-4xl">Ready to Build Your Own Mini <span className="text-orange-500">Construction Site?</span></h2>
               <p className="mt-4 text-muted max-w-lg">Book your RC Cafe package and enjoy Auckland's unique family-friendly construction arena and cafe.</p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <Link to="/booking#calendar" className="btn-primary">Book Now <ArrowRight size={16} /></Link>
@@ -311,7 +409,7 @@ function FinalCTA() {
               </div>
             </div>
             <div className="rounded-2xl overflow-hidden border border-border bg-white shadow-soft">
-              <img src="/images/rc-excavator-arena.jpg" alt="RC excavator arena" className="w-full h-72 object-cover" />
+              <img src="/images/rc-excavator-arena.jpg" alt="RC excavator arena" className="w-full h-60 object-cover sm:h-64" />
             </div>
           </div>
         </div>

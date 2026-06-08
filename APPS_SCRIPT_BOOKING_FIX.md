@@ -21,8 +21,16 @@ Frontend payload includes:
   "playTime": "45 Min Play",
   "bookingStatus": "Pending Confirmation",
   "adminStatus": "Pending Confirmation",
-  "toastieChoice": "",
-  "coffeeChoice": ""
+  "toastieChoice": "Ham & Cheese",
+  "coffeeChoice": "Latte",
+  "toastieSelection": "Ham & Cheese",
+  "drinkSelection": "Latte",
+  "notificationEmails": [
+    "cafemteden@gmail.com",
+    "mtedencafestaff@gmail.com"
+  ],
+  "notificationEmail": "cafemteden@gmail.com,mtedencafestaff@gmail.com",
+  "emailRecipients": "cafemteden@gmail.com,mtedencafestaff@gmail.com"
 }
 ```
 
@@ -63,6 +71,11 @@ function doPost(e) {
     const packagePrice = String(data.packagePrice || '').trim();
     const playTime = String(data.playTime || '').trim();
     const bookingStatus = String(data.bookingStatus || data.adminStatus || 'Pending Confirmation').trim();
+    const notificationEmail = String(
+      data.notificationEmail ||
+      data.emailRecipients ||
+      'cafemteden@gmail.com,mtedencafestaff@gmail.com'
+    ).trim();
 
     if (!name || !phone || !email || !date || !slotTime) {
       return jsonResponse({
@@ -90,7 +103,22 @@ function doPost(e) {
       bookingStatus
     ]);
 
-    // Keep the existing admin/client email notification logic here.
+    MailApp.sendEmail({
+      to: notificationEmail,
+      subject: `New RCC Booking Request - ${bookingId}`,
+      htmlBody: `
+        <h2>New Booking Request</h2>
+        <p><strong>Booking ID:</strong> ${bookingId}</p>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Phone:</strong> ${phone}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Date:</strong> ${date}</p>
+        <p><strong>Slot:</strong> ${slotTime}</p>
+        <p><strong>Package:</strong> ${packageName}</p>
+        <p><strong>Play Time:</strong> ${playTime}</p>
+        <p><strong>Status:</strong> ${bookingStatus}</p>
+      `
+    });
 
     return jsonResponse({
       status: 'success',

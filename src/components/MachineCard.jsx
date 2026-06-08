@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Users } from 'lucide-react'
 
-export default function MachineCard({ m, index = 0 }) {
+export default function MachineCard({ m, index = 0, compact = false }) {
   return (
     <motion.article
       initial={{ opacity: 0, y: 24 }}
@@ -12,7 +12,7 @@ export default function MachineCard({ m, index = 0 }) {
       whileHover={{ y: -6 }}
       className="group card card-hover overflow-hidden"
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-bg-soft">
+      <div className={`relative overflow-hidden bg-bg-soft ${compact ? 'h-36 sm:h-40 lg:h-36' : 'aspect-[4/3]'}`}>
         <img
           src={m.image}
           alt={m.name}
@@ -26,10 +26,10 @@ export default function MachineCard({ m, index = 0 }) {
           <Users size={12} /> ×{m.capacity}
         </div>
       </div>
-      <div className="p-5">
-        <h3 className="font-display text-xl font-extrabold text-charcoal-300">{m.name}</h3>
-        <p className="mt-1.5 text-sm text-muted leading-relaxed">{m.description}</p>
-        <div className="mt-4 flex items-center justify-between">
+      <div className={compact ? 'p-4' : 'p-5'}>
+        <h3 className={`font-display font-extrabold text-charcoal-300 ${compact ? 'text-lg' : 'text-xl'}`}>{m.name}</h3>
+        <p className={`${compact ? 'mt-1 line-clamp-2' : 'mt-1.5'} text-sm text-muted leading-relaxed`}>{m.description}</p>
+        <div className={`${compact ? 'mt-3' : 'mt-4'} flex items-center justify-between`}>
           <span className="text-[11px] uppercase tracking-widest text-orange-600 font-bold">{m.capacity}/slot</span>
           <Link
             to="/booking#calendar"
