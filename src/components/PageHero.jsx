@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 
-export default function PageHero({ eyebrow, title, subtitle, image, breadcrumbs = [] }) {
+export default function PageHero({ eyebrow, title, subtitle, image, imageAlt = '', breadcrumbs = [] }) {
   return (
     <section className="relative overflow-hidden bg-bg-soft border-b border-border">
       <div className="container-x grid lg:grid-cols-12 gap-8 sm:gap-10 py-10 sm:py-14 lg:py-20 items-center">
@@ -45,7 +45,7 @@ export default function PageHero({ eyebrow, title, subtitle, image, breadcrumbs 
             className="lg:col-span-5"
           >
             <div className="rounded-3xl overflow-hidden border border-border bg-white shadow-soft">
-              <img src={image} alt="" className="w-full h-64 sm:h-80 object-cover" />
+              <img src={image} alt={imageAlt} loading="lazy" className="w-full h-64 sm:h-80 object-cover" />
             </div>
           </motion.div>
         )}

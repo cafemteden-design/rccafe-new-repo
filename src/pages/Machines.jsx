@@ -1,12 +1,15 @@
 import PageHero from '../components/PageHero.jsx'
 import MachineCard from '../components/MachineCard.jsx'
 import SectionHeading from '../components/SectionHeading.jsx'
+import SEO from '../components/SEO.jsx'
 import { MACHINES } from '../data/machines.js'
+import { PAGE_SEO } from '../data/seo.js'
 import { Link } from 'react-router-dom'
 
 export default function Machines() {
   return (
     <>
+      <SEO {...PAGE_SEO['/machines']} path="/machines" />
       <PageHero
         breadcrumbs={['RC Machines']}
         eyebrow="The Fleet"

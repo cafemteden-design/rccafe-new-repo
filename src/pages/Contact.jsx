@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Phone, MapPin, Clock, Instagram, Facebook, Youtube, Send, CheckCircle2 } from 'lucide-react'
+import { Mail, MapPin, Clock, Instagram, Facebook, Youtube, Send, CheckCircle2 } from 'lucide-react'
 import PageHero from '../components/PageHero.jsx'
+import SEO from '../components/SEO.jsx'
 import { SITE } from '../data/site.js'
+import { PAGE_SEO, breadcrumbSchema } from '../data/seo.js'
+import { trackEmailClick, trackContactSubmission } from '../hooks/useAnalytics.js'
 
 function TikTokIcon(props) {
   return (
@@ -13,87 +15,117 @@ function TikTokIcon(props) {
 }
 
 export default function Contact() {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' })
+  const [form, setForm] = useState({ name: '', email: '', enquiryType: 'General Enquiry', message: '' })
   const [sent, setSent] = useState(false)
-  const set = (k) => (e) => setForm((s) => ({ ...s, [k]: e.target.value }))
-  const submit = (e) => { e.preventDefault(); setSent(true) }
+  const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+
+  const submit = (e) => {
+    e.preventDefault()
+    const subject = encodeURIComponent(`Remote Control Cafe enquiry - ${form.enquiryType}`)
+    const body = encodeURIComponent(`Name: ${form.name}\nEmail: ${form.email}\nEnquiry Type: ${form.enquiryType}\n\n${form.message}`)
+    trackContactSubmission({ enquiry_type: form.enquiryType, method: 'mailto' })
+    window.location.href = `mailto:${SITE.email}?subject=${subject}&body=${body}`
+    setSent(true)
+  }
 
   return (
     <>
+      <SEO {...PAGE_SEO['/contact']} path="/contact" schema={breadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Contact', path: '/contact' }])} />
       <PageHero
         breadcrumbs={['Contact']}
-        eyebrow="Get In Touch"
-        title={<>Contact <span className="accent">RC Cafe</span></>}
-        subtitle="Plan a group visit, ask about machines, or organise a birthday — we’d love to hear from you."
-        image="/images/family-cafe-activity.jpg"
+        eyebrow="Contact"
+        title={<>Contact <span className="accent">Remote Control Cafe</span></>}
+        subtitle="Send an enquiry for everyday visits, event bookings, venue hire, school holiday sessions and private functions."
+        image="/images/about-venue.jpg"
       />
+
       <section className="section-light py-12 sm:py-16">
-        <div className="container-x grid lg:grid-cols-5 gap-8">
-          <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="lg:col-span-2 space-y-4">
-            <InfoCard icon={Phone} title="Call Us" value={SITE.phone} href={`tel:${SITE.phoneTel}`} />
-            <InfoCard icon={MapPin} title="Location" value={SITE.location} />
-            <InfoCard icon={Clock} title="Opening" value={SITE.hours} />
-            <div className="card p-5">
-              <div className="text-xs uppercase tracking-widest text-orange-600 font-bold">Follow Us</div>
-              <div className="mt-3 flex items-center gap-3">
-                <a href={SITE.socials.instagram} target="_blank" rel="noreferrer" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 hover:border-orange-500 hover:text-orange-600"><Instagram size={18} /></a>
-                <a href={SITE.socials.facebook} target="_blank" rel="noreferrer" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 hover:border-orange-500 hover:text-orange-600"><Facebook size={18} /></a>
-                <a href={SITE.socials.tiktok} target="_blank" rel="noreferrer" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 hover:border-orange-500 hover:text-orange-600"><TikTokIcon className="h-[18px] w-[18px]" /></a>
-                <a href={SITE.socials.youtube} target="_blank" rel="noreferrer" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 hover:border-orange-500 hover:text-orange-600"><Youtube size={18} /></a>
+        <div className="container-x grid gap-8 lg:grid-cols-12">
+          <div className="lg:col-span-5">
+            <div className="grid gap-4">
+              <InfoCard icon={Mail} title="Email Us" value="Send Enquiry" href={`mailto:${SITE.email}`} onClick={() => trackEmailClick({ location: 'contact_page' })} />
+              <InfoCard icon={MapPin} title="Visit Us" value={SITE.location} href={SITE.googleBusiness} />
+              <InfoCard icon={Clock} title="Opening Hours" value={SITE.hours} />
+            </div>
+            <div className="mt-6 card p-5">
+              <h3 className="font-display text-xl font-extrabold text-charcoal-300">Follow Remote Control Cafe</h3>
+              <div className="mt-4 flex gap-3">
+                <Social href={SITE.socials.instagram} label="Instagram" icon={Instagram} />
+                <Social href={SITE.socials.facebook} label="Facebook" icon={Facebook} />
+                <Social href={SITE.socials.tiktok} label="TikTok" icon={TikTokIcon} />
+                <Social href={SITE.socials.youtube} label="YouTube" icon={Youtube} />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.form initial={{ opacity: 0, x: 16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} onSubmit={submit} className="lg:col-span-3 card p-6 sm:p-8">
-            {sent ? (
-              <div className="text-center py-12">
-                <CheckCircle2 size={56} className="text-orange-500 mx-auto" />
-                <h3 className="font-display text-3xl font-extrabold mt-4 text-charcoal-300">Message Sent!</h3>
-                <p className="mt-2 text-muted">Thank you for reaching out. Our team will reply soon.</p>
-              </div>
-            ) : (
-              <>
-                <h3 className="font-display text-2xl font-extrabold text-charcoal-300">Send a Message</h3>
-                <p className="mt-1 text-muted text-sm">We respond Auckland local time, every day.</p>
-                <div className="mt-6 grid sm:grid-cols-2 gap-4">
-                  <Input label="Full Name" value={form.name} onChange={set('name')} required />
-                  <Input label="Email" type="email" value={form.email} onChange={set('email')} required />
-                  <Input label="Phone" value={form.phone} onChange={set('phone')} className="sm:col-span-2" />
-                  <div className="sm:col-span-2">
-                    <label className="field-label">Message</label>
-                    <textarea value={form.message} onChange={set('message')} required rows={5} className="field-input resize-none" placeholder="Tell us about your visit, group or query..." />
-                  </div>
+          <div className="lg:col-span-7">
+            <form onSubmit={submit} className="card p-5 sm:p-7">
+              <h2 className="font-display text-3xl font-extrabold text-charcoal-300">Send an enquiry</h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted">Tell us what you are planning and our team will respond within 24 hours.</p>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <Input label="Full Name" value={form.name} onChange={set('name')} required />
+                <Input label="Email" type="email" value={form.email} onChange={set('email')} required />
+                <div className="sm:col-span-2">
+                  <label className="field-label">Enquiry Type</label>
+                  <select value={form.enquiryType} onChange={(event) => set('enquiryType')(event.target.value)} className="field-input">
+                    <option>General Enquiry</option>
+                    <option>Party Booking</option>
+                    <option>Venue Hire</option>
+                    <option>Corporate / Event Booking</option>
+                    <option>School Holiday / Public Holiday Booking</option>
+                  </select>
                 </div>
-                <button type="submit" className="btn-primary mt-6 w-full sm:w-auto">Send Message <Send size={16} /></button>
-              </>
-            )}
-          </motion.form>
+                <TextArea label="Message" value={form.message} onChange={set('message')} className="sm:col-span-2" required />
+              </div>
+              {sent && (
+                <div className="mt-5 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
+                  <CheckCircle2 size={18} /> Your email app has opened with your enquiry details.
+                </div>
+              )}
+              <button type="submit" className="btn-primary mt-6 min-h-[54px]">
+                Send Enquiry <Send size={16} />
+              </button>
+            </form>
+          </div>
         </div>
       </section>
     </>
   )
 }
 
-function InfoCard({ icon: Icon, title, value, href }) {
-  const Wrap = href ? 'a' : 'div'
-  return (
-    <Wrap href={href} className="flex items-start gap-4 card p-5 hover:border-orange-300 transition">
-      <div className="grid place-items-center w-11 h-11 rounded-xl bg-orange-100 text-orange-600 flex-shrink-0">
-        <Icon size={20} />
-      </div>
+function InfoCard({ icon: Icon, title, value, href, onClick }) {
+  const content = (
+    <div className="flex items-start gap-4 rounded-2xl border border-border bg-white p-5 shadow-soft transition hover:border-orange-200">
+      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-600"><Icon size={20} /></div>
       <div>
-        <div className="text-[11px] uppercase tracking-widest text-muted font-bold">{title}</div>
-        <div className="mt-0.5 font-bold text-charcoal-300">{value}</div>
+        <div className="text-xs font-bold uppercase tracking-widest text-muted">{title}</div>
+        <div className="mt-1 font-semibold text-charcoal-300">{value}</div>
       </div>
-    </Wrap>
+    </div>
+  )
+
+  if (href) return <a href={href} onClick={onClick} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined}>{content}</a>
+  return content
+}
+
+function Social({ href, label, icon: Icon }) {
+  return <a href={href} target="_blank" rel="noreferrer" aria-label={label} className="rounded-full border border-border bg-white p-3 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><Icon size={18} /></a>
+}
+
+function Input({ label, value, onChange, type = 'text', required }) {
+  return (
+    <div>
+      <label className="field-label">{label}{required && <span className="text-orange-500">*</span>}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} required={required} className="field-input" />
+    </div>
   )
 }
 
-function Input({ label, className = '', ...props }) {
+function TextArea({ label, value, onChange, required, className = '' }) {
   return (
     <div className={className}>
-      <label className="field-label">{label}</label>
-      <input {...props} className="field-input" />
+      <label className="field-label">{label}{required && <span className="text-orange-500">*</span>}</label>
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} required={required} rows={5} className="field-input resize-y" />
     </div>
   )
 }

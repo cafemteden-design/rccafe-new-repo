@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Logo from './Logo.jsx'
 
 const FLAG_KEY = '__rccafe_loaded'
-const DURATION_MS = 2200
+const DURATION_MS = 700
 
 export default function Loader() {
   const [show, setShow] = useState(() => {
@@ -56,7 +56,7 @@ export default function Loader() {
             <motion.div
               initial={{ opacity: 0, y: 8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
               className="flex items-center justify-center"
             >
               <Logo className="h-20 sm:h-24 w-auto" />
@@ -84,7 +84,7 @@ export default function Loader() {
                   key={i}
                   className="h-1.5 w-1.5 rounded-full bg-orange-500"
                   animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.12 }}
+                  transition={{ duration: 0.65, repeat: Infinity, delay: i * 0.1 }}
                 />
               ))}
             </div>

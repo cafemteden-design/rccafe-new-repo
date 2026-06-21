@@ -61,6 +61,8 @@ export const RC_PACKAGES = [
     price: 32,
     includesToastie: true,
     includesCoffee: true,
+    available: false,
+    badge: 'Currently Unavailable',
     summary: '30 Min Play + Toastie + Hot Coffee'
   },
   {
@@ -72,6 +74,7 @@ export const RC_PACKAGES = [
     badge: 'Most Popular',
     includesToastie: true,
     includesCoffee: true,
+    available: true,
     summary: '45 Min Play + Toastie + Hot Coffee'
   },
   {
@@ -82,6 +85,7 @@ export const RC_PACKAGES = [
     price: 55,
     includesToastie: true,
     includesCoffee: true,
+    available: true,
     summary: '60 Min Play + Toastie + Hot Coffee'
   }
 ]
@@ -89,30 +93,6 @@ export const RC_PACKAGES = [
 export const UPGRADED_PLAY = [
   { id: 'upgrade-15', name: 'Upgraded Play 15 Min', playTime: '15 Min Play', durationMinutes: 15, price: 15, summary: '15 Min Play' },
   { id: 'upgrade-30', name: 'Upgraded Play 30 Min', playTime: '30 Min Play', durationMinutes: 30, price: 20, summary: '30 Min Play' }
-]
-
-export const PLAY_UPGRADES = [
-  {
-    id: 'none',
-    name: 'No Extra Time',
-    durationMinutes: 0,
-    price: 0,
-    summary: 'Keep included package play time'
-  },
-  {
-    id: 'extra-15',
-    name: 'Add 15 Min Extra Play',
-    durationMinutes: 15,
-    price: 15,
-    summary: '+15 Min extra play'
-  },
-  {
-    id: 'extra-30',
-    name: 'Add 30 Min Extra Play',
-    durationMinutes: 30,
-    price: 20,
-    summary: '+30 Min extra play'
-  }
 ]
 
 export const BOOKING_OPTIONS = RC_PACKAGES

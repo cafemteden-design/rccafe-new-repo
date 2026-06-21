@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Private / functional pages
+Disallow: /staff-rewards
+Disallow: /staff/rewards
+Disallow: /admin-rewards
+Disallow: /admin/rewards
+Disallow: /admin/
+Disallow: /reward-card
+Disallow: /rewards/card/
+
+Sitemap: https://remotecontrolcafe.co.nz/sitemap.xml

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BadgeCheck, CalendarDays, CheckCircle2, Gift, History, LockKeyhole, Phone, QrCode, RotateCcw, ScanLine, Search, ShieldAlert, UserRound } from 'lucide-react'
+import { BadgeCheck, CalendarDays, CheckCircle2, Gift, History, LockKeyhole, QrCode, RotateCcw, ScanLine, Search, ShieldAlert, UserRound } from 'lucide-react'
 import StampProgress from '../components/rewards/StampProgress.jsx'
+import SEO from '../components/SEO.jsx'
 import { getRewardStatus } from '../components/rewards/RewardCardDisplay.jsx'
 import {
   addRewardStamp,
@@ -33,14 +34,14 @@ export default function StaffRewards() {
     const card = seedDemoRewardCard()
     refresh(card.cardId)
     setQuery(card.cardId)
-    setMessage({ type: 'success', text: `Demo scan found ${card.cardId}.` })
+    setMessage({ type: 'success', text: `Sample scan found ${card.cardId}.` })
   }
 
   const searchCard = (event) => {
     event.preventDefault()
     const card = getRewardCardByCardId(query)
     if (!card) {
-      setMessage({ type: 'error', text: 'No demo card found for this Card ID.' })
+      setMessage({ type: 'error', text: 'No card found for this Card ID.' })
       return
     }
     refresh(card.cardId)
@@ -68,16 +69,17 @@ export default function StaffRewards() {
       setPinError('')
       return
     }
-    setPinError('Incorrect PIN. Use 1234 for demo mode.')
+    setPinError('Incorrect PIN. Use 1234 for staff preview access.')
   }
 
   return (
     <section className="section-light py-6 sm:py-10">
+      <SEO title="Staff Rewards | RCC Cafe" description="RCC staff reward card panel." noindex />
       <div className="container-x">
         <div className="max-w-3xl">
-          <span className="eyebrow"><ScanLine size={14} />Staff Demo</span>
+          <span className="eyebrow"><ScanLine size={14} />Staff Panel</span>
           <h1 className="mt-4 font-display text-3xl font-extrabold text-charcoal-300 sm:text-4xl">Staff Reward Scanner</h1>
-          <p className="mt-2 text-muted">Scan demo cards, add one visit stamp, and redeem unlocked gifts.</p>
+          <p className="mt-2 text-muted">Scan reward cards, add eligible visit stamps, and redeem unlocked gifts.</p>
         </div>
 
         {!pinOk ? (
@@ -86,7 +88,7 @@ export default function StaffRewards() {
               <LockKeyhole size={22} />
             </div>
             <h2 className="mt-4 font-display text-2xl font-extrabold text-charcoal-300">Enter Staff PIN</h2>
-            <p className="mt-2 text-sm text-muted">Staff access only. Demo PIN: 1234</p>
+            <p className="mt-2 text-sm text-muted">Staff access only. Preview PIN: 1234</p>
             <input
               value={pin}
               onChange={(event) => { setPin(event.target.value); setPinError('') }}
@@ -98,7 +100,7 @@ export default function StaffRewards() {
             {pinError && <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{pinError}</div>}
             <button type="submit" className="btn-primary mt-5 w-full">Unlock Staff Panel</button>
             <button type="button" onClick={() => { setPin('1234'); setPinOk(true); setPinError('') }} className="btn-outline mt-3 w-full">
-              Demo Unlock
+              Preview Unlock
             </button>
           </form>
         ) : (
@@ -106,16 +108,16 @@ export default function StaffRewards() {
         <div className="container-x grid gap-8 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <div className="card p-5 sm:p-6">
-              <span className="eyebrow"><ScanLine size={14} />Demo Scanner</span>
+              <span className="eyebrow"><ScanLine size={14} />Scanner</span>
               <div className="mt-5 rounded-3xl border border-dashed border-orange-300 bg-orange-50 p-5 text-center">
                 <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white text-orange-600 shadow-soft">
                   <QrCode size={28} />
                 </div>
                 <h2 className="mt-4 font-display text-2xl font-extrabold text-charcoal-300">Scanner Preview</h2>
                 <p className="mt-2 text-sm leading-relaxed text-muted">
-                  Final live scanner will scan customer QR securely. Use Demo Scan Card for this frontend preview.
+                  Staff scans a customer QR, opens the card, then adds eligible stamps.
                 </p>
-                <button onClick={runDemoScan} className="btn-primary mt-5 w-full">Demo Scan Card <ScanLine size={16} /></button>
+                <button onClick={runDemoScan} className="btn-primary mt-5 w-full">Scan Sample Card <ScanLine size={16} /></button>
               </div>
 
               <form onSubmit={searchCard} className="mt-5">
@@ -124,7 +126,7 @@ export default function StaffRewards() {
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="RCC-1001"
+                    placeholder="RCC1001"
                     className="field-input !mt-0"
                   />
                   <button type="submit" className="grid h-[46px] w-[52px] flex-shrink-0 place-items-center rounded-xl bg-charcoal-300 text-white">
@@ -145,7 +147,7 @@ export default function StaffRewards() {
             </div>
 
             <div className="mt-5 card p-5 sm:p-6">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-orange-600">Demo Cards</div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-orange-600">Reward Cards</div>
               <div className="mt-4 grid gap-3">
                 {cards.length === 0 ? (
                   <EmptyState />
@@ -193,10 +195,9 @@ export default function StaffRewards() {
                   <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
                     <StaffMetric icon={UserRound} label="Customer Name" value={selectedCard.name} />
                     <StaffMetric icon={BadgeCheck} label="Card ID" value={selectedCard.cardId} />
-                    <StaffMetric icon={Phone} label="Mobile" value={selectedCard.phone} />
                     <StaffMetric icon={RotateCcw} label="Current Cycle" value={`Cycle ${selectedCard.cycle}`} />
                     <StaffMetric icon={CheckCircle2} label="Current Stamps" value={`${selectedCard.stampCount}/7`} />
-                    <StaffMetric icon={CalendarDays} label="Last Stamp Date" value={selectedCard.lastStampDate || 'Not stamped today'} />
+                    <StaffMetric icon={CalendarDays} label="Latest Stamp Date" value={selectedCard.lastStampDate || 'No stamps yet'} />
                   </div>
 
                   <div className="px-5 pb-5 sm:px-6 sm:pb-6">
@@ -223,7 +224,7 @@ export default function StaffRewards() {
                 <div className="mt-5 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-relaxed text-charcoal-300">
                   <div className="flex items-start gap-2">
                     <ShieldAlert className="mt-0.5 flex-shrink-0 text-orange-700" size={18} />
-                    <span>Duplicate stamp protection uses Auckland date and blocks another stamp for the same card on the same day.</span>
+                    <span>Only one stamp can be added to the same reward card per Auckland calendar day. Duplicate attempts are blocked automatically.</span>
                   </div>
                 </div>
 
@@ -234,7 +235,7 @@ export default function StaffRewards() {
                 <div>
                   <UserRound size={46} className="mx-auto text-orange-500" />
                   <h2 className="mt-4 font-display text-2xl font-extrabold text-charcoal-300">No Card Selected</h2>
-                  <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">Create a customer reward card first or use Demo Scan Card to generate a sample.</p>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">Create a customer reward card first or scan a sample card.</p>
                   <Link to="/rewards" className="btn-primary mt-5">Create Customer Card</Link>
                 </div>
               </div>
@@ -292,7 +293,7 @@ function StaffMetric({ icon: Icon, label, value }) {
 function EmptyState() {
   return (
     <div className="rounded-2xl border border-border bg-bg-soft p-4 text-sm text-muted">
-      No demo cards yet. Create one from the Rewards page or use Demo Scan Card.
+      No reward cards yet. Create one from the Rewards page or scan a sample card.
     </div>
   )
 }

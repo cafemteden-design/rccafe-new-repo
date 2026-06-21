@@ -1,1022 +1,610 @@
-import { useState, useEffect, useRef, useId } from 'react'
-import { motion } from 'framer-motion'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import {
-  Calendar, Clock, Users, ArrowRight, ArrowLeft, CheckCircle2, Mail, Phone, User, ChevronLeft, ChevronRight, X, Coffee, Cake, Building2, GraduationCap, Gift, MessageSquare
+  ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight,
+  ChevronDown, Clock3, Coffee, Gamepad2, Lock, Mail, MessageSquare, Minus, Phone,
+  Plus, RefreshCw, Sandwich, Send, User, X
 } from 'lucide-react'
-import PageHero from '../components/PageHero.jsx'
-import { COFFEE_CHOICES, PLAY_UPGRADES, RC_PACKAGES, TOASTIE_CHOICES } from '../data/menu.js'
-import { SITE } from '../data/site.js'
-import {
-  generateSlotsForDate,
-  fetchSlotAvailability,
-  getAvailableDates,
-  getAucklandToday,
-  formatDateKey,
-  formatDateDisplay,
-  submitBooking,
-  validateBookingData
-} from '../data/bookingConfig.js'
+import SEO from '../components/SEO.jsx'
+import { PAGE_SEO } from '../data/seo.js'
+import { COFFEE_CHOICES, TOASTIE_CHOICES } from '../data/menu.js'
+import { fetchSlotAvailability, formatDateDisplay, formatDateKey, getAucklandToday, submitBooking } from '../data/bookingConfig.js'
+import { useBookingSettings } from '../hooks/useBookingSettings.js'
+import { trackBookingSubmission } from '../hooks/useAnalytics.js'
+import { isSupabaseConfigured } from '../lib/supabaseClient.js'
+import { createPendingBooking, fetchApprovedSlotUsage, subscribeToSlotCapacity } from '../services/bookingV2.js'
 
-const RCC_EMAILS = ['cafemteden@gmail.com', 'mtedencafestaff@gmail.com']
-const RCC_EMAIL = RCC_EMAILS.join(',')
-
-const STEPS = ['Date', 'Package', 'Food', 'Time', 'Details', 'Summary']
-
-const EVENT_BOOKINGS = [
-  { icon: Cake, title: 'Birthday Parties', desc: 'RC-themed birthdays for kids and adults.' },
-  { icon: Building2, title: 'Corporate Bookings', desc: 'Team outings, corporate events and special functions.' },
-  { icon: GraduationCap, title: 'School Visits', desc: 'Hands-on learning with real construction machinery.' },
-  { icon: Users, title: 'Group Bookings', desc: 'Food + RC play packages for families, friends and teams.' },
-  { icon: Gift, title: 'Special Functions', desc: 'Free venue hire available for special functions and events.' }
-]
-
-const TRUST_ITEMS = [
-  'Instant Booking Request',
-  'No Advance Payment Required',
-  'Family Friendly Environment',
-  'Friendly Staff Assistance',
-  'WhatsApp Booking Support',
-  'Easy Rescheduling Support'
-]
-
-const IMPORTANT_INFO = [
-  'Your booking request will be reviewed by our team.',
-  'We will confirm your slot via WhatsApp or phone call.',
-  'Please arrive 10 minutes before your session.',
-  'Need to make changes? Our team will be happy to assist.'
-]
-
-function startOfMonth(d) { const x = new Date(d); x.setDate(1); x.setHours(0, 0, 0, 0); return x }
-function addMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth() + n); return x }
-function isSameDay(a, b) { return a && b && a.toDateString() === b.toDateString() }
-function formatMinutes(minutes) { return `${Number(minutes) || 0} Min` }
-
-function getSelectedPackage(packageId) {
-  return RC_PACKAGES.find((item) => item.id === packageId) || null
-}
-
-function getSelectedUpgrade(upgradeId) {
-  return PLAY_UPGRADES.find((item) => item.id === upgradeId) || PLAY_UPGRADES[0]
-}
-
-function getBookingTotals(packageId, upgradeId) {
-  const selectedPackage = getSelectedPackage(packageId)
-  const selectedUpgrade = getSelectedUpgrade(upgradeId)
-  const baseDuration = Number(selectedPackage?.durationMinutes || 0)
-  const extraDuration = Number(selectedUpgrade?.durationMinutes || 0)
-  const basePrice = Number(selectedPackage?.price || 0)
-  const upgradePrice = Number(selectedUpgrade?.price || 0)
-  const totalDuration = baseDuration + extraDuration
-  const totalPrice = basePrice + upgradePrice
-
+const STEPS = ['Date', 'Time', 'Remotes', 'Gameplay', 'Food', 'Details', 'Summary']
+const FIXED_SLOTS = Array.from({ length: 8 }, (_, index) => {
+  const startHour = 9 + index
   return {
-    selectedPackage,
-    selectedUpgrade,
-    baseDuration,
-    extraDuration,
-    totalDuration,
-    basePrice,
-    upgradePrice,
-    totalPrice,
-    basePlayTime: selectedPackage ? formatMinutes(baseDuration) : '',
-    extraPlayTime: extraDuration ? `+${formatMinutes(extraDuration)}` : 'No Extra Time',
-    totalPlayTime: selectedPackage ? formatMinutes(totalDuration) : ''
+    index,
+    startTime: formatHour(startHour),
+    endTime: formatHour(startHour + 1),
+    label: `${formatHour(startHour)} - ${formatHour(startHour + 1)}`
   }
-}
+})
+const DURATIONS = [
+  { minutes: 45, price: 45 },
+  { minutes: 60, price: 55 }
+]
+const ENQUIRY_COPY = 'Need more than 8 remotes or a larger group session? Please contact us through the enquiry form. Extra arrangements may be available depending on staff and timing.'
+const ADD_ON_COPY = 'If you would like to extend your gameplay after your booked session, additional gameplay time may be arranged in-store depending on availability.'
 
 export default function Booking() {
-  const [searchParams] = useSearchParams()
   const location = useLocation()
-  const calendarRef = useRef(null)
-  const initialPackage = getPackageFromParam(searchParams.get('package'))
+  const flowRef = useRef(null)
+  const { settings, loading: settingsLoading, error: settingsError, retry: retrySettings } = useBookingSettings()
   const [step, setStep] = useState(0)
-  const [submitted, setSubmitted] = useState(false)
-  const [submittedData, setSubmittedData] = useState(null)
+  const [viewMonth, setViewMonth] = useState(startOfMonth(getAucklandToday()))
+  const [availability, setAvailability] = useState({})
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [availabilityError, setAvailabilityError] = useState('')
+  const [availabilityVersion, setAvailabilityVersion] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(null)
   const [errors, setErrors] = useState({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isLoadingSlots, setIsLoadingSlots] = useState(false)
+  const [remoteEditorOpen, setRemoteEditorOpen] = useState(false)
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false)
   const [data, setData] = useState({
     date: null,
     slotIndex: null,
-    name: '',
-    phone: '',
-    email: '',
-    groupSize: 1,
-    packageId: initialPackage?.id || '',
-    upgradeId: 'none',
-    toastieChoice: '',
-    coffeeChoice: '',
-    notes: '',
-    confirmAttendance: false
+    remotes: 0,
+    durationMinutes: 0,
+    toastieSelection: '',
+    drinkSelection: '',
+    customerName: '',
+    customerEmail: '',
+    customerPhone: '',
+    notes: ''
   })
 
-  const [availableDates] = useState(getAvailableDates())
-  const [slots, setSlots] = useState([])
-  const [viewMonth, setViewMonth] = useState(startOfMonth(new Date()))
+  const maxCapacity = Math.min(Number(settings.maxCapacity || 8), 8)
+  const selectedSlot = data.slotIndex === null ? null : slotsWithAvailability(availability, maxCapacity)[data.slotIndex]
+  const duration = DURATIONS.find((item) => item.minutes === data.durationMinutes) || null
+  const totalPrice = duration ? data.remotes * duration.price : 0
+  const availableDates = useMemo(() => createAvailableDates(settings), [settings])
+  const slots = useMemo(() => slotsWithAvailability(availability, maxCapacity), [availability, maxCapacity])
 
   useEffect(() => {
-    let ignore = false
-    const { selectedPackage, totalDuration } = getBookingTotals(data.packageId, data.upgradeId)
-
-    if (data.date && selectedPackage && totalDuration > 0) {
-      setIsLoadingSlots(true)
-      setErrors((current) => ({ ...current, availability: '' }))
-      setSlots([])
-
-      fetchSlotAvailability(data.date)
-        .then((availability) => {
-          if (!ignore) setSlots(generateSlotsForDate(data.date, availability, totalDuration))
-        })
-        .catch(() => {
-          if (!ignore) {
-            setSlots(generateSlotsForDate(data.date, {}, totalDuration))
-            setErrors((current) => ({
-              ...current,
-              availability: 'We could not verify live availability, but you can still submit your request. RCC will confirm your slot by phone or WhatsApp.'
-            }))
-          }
-        })
-        .finally(() => {
-          if (!ignore) setIsLoadingSlots(false)
-        })
-    } else {
-      setSlots([])
-      setIsLoadingSlots(false)
-    }
-
-    return () => { ignore = true }
-  }, [data.date, data.packageId, data.upgradeId])
-
-  useEffect(() => {
-    if (initialPackage?.id) {
-      setData((current) => ({
-        ...current,
-        packageId: initialPackage.id,
-        upgradeId: 'none',
-        slotIndex: null,
-        toastieChoice: '',
-        coffeeChoice: ''
-      }))
-    }
-  }, [initialPackage?.id])
-
-  useEffect(() => {
-    if (location.hash === '#calendar') {
-      window.setTimeout(() => {
-        calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 80)
-    }
+    if (location.hash === '#calendar') window.setTimeout(() => flowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }, [location.hash])
+
+  useEffect(() => {
+    if (!data.date) return undefined
+    let active = true
+    const load = async () => {
+      setAvailabilityLoading(true)
+      setAvailabilityError('')
+      try {
+        const dateKey = formatDateKey(data.date)
+        if (isSupabaseConfigured) {
+          try {
+            const rows = await fetchApprovedSlotUsage(dateKey)
+            if (active) setAvailability(Object.fromEntries(rows.map((row) => [normalizeStart(row.slot_time), Number(row.approved_spots || 0)])))
+          } catch {
+            const result = await fetchSlotAvailability(data.date)
+            if (active) setAvailability(appsAvailabilityToUsage(result, maxCapacity))
+          }
+        } else {
+          const result = await fetchSlotAvailability(data.date)
+          if (active) setAvailability(appsAvailabilityToUsage(result, maxCapacity))
+        }
+      } catch {
+        if (active) {
+          setAvailability({})
+          setAvailabilityError('Live availability is temporarily unavailable. Slots are shown with fallback capacity and approval will be confirmed by RCC.')
+        }
+      } finally {
+        if (active) setAvailabilityLoading(false)
+      }
+    }
+    load()
+    return () => { active = false }
+  }, [data.date, availabilityVersion, maxCapacity])
+
+  useEffect(() => {
+    if (!data.date || !isSupabaseConfigured) return undefined
+    return subscribeToSlotCapacity(formatDateKey(data.date), () => setAvailabilityVersion((value) => value + 1))
+  }, [data.date])
+
+  useEffect(() => {
+    const capacityReduced = Boolean(selectedSlot && data.remotes > selectedSlot.remaining)
+    if (!capacityReduced) return
+    setErrors((current) => ({ ...current, remotes: `Only ${selectedSlot.remaining} remotes are now available for this slot. Please reduce your selection to continue.` }))
+    setRemoteEditorOpen(true)
+    setMobileSummaryOpen(true)
+  }, [data.remotes, selectedSlot?.remaining])
+
+  useEffect(() => {
+    if (step === 6) setMobileSummaryOpen(true)
+  }, [step])
+
+  useEffect(() => {
+    if (!remoteEditorOpen) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [remoteEditorOpen])
 
   const update = (patch) => {
     setErrors({})
-    setData((s) => ({ ...s, ...patch }))
+    setData((current) => ({ ...current, ...patch }))
   }
 
-  const canNext = () => {
-    switch (step) {
-      case 0: return !!data.date
-      case 1: {
-        const selectedPackage = getSelectedPackage(data.packageId)
-        return Boolean(selectedPackage)
-      }
-      case 2:
-        return Boolean(data.toastieChoice && data.coffeeChoice)
-      case 3: {
-        const selectedSlot = slots.find(s => s.index === data.slotIndex)
-        return selectedSlot && selectedSlot.status !== 'full' && selectedSlot.available > 0
-      }
-      case 4: return data.name.trim() && data.phone.trim() && data.email.trim() && data.groupSize > 0
-      default: return true
+  const selectDate = (date) => {
+    update({ date, slotIndex: null, remotes: 0 })
+    setAvailability({})
+    setStep(1)
+  }
+
+  const selectSlot = (slot) => {
+    if (slot.remaining <= 0) return
+    update({ slotIndex: slot.index, remotes: 0 })
+    setStep(2)
+  }
+
+  const selectRemotes = (count) => {
+    if (!selectedSlot || count > selectedSlot.remaining) {
+      setErrors({ remotes: `Only ${selectedSlot?.remaining || 0} remote spots remain in this hour.` })
+      return
     }
+    update({ remotes: count })
+    setStep(3)
+  }
+
+  const editRemotes = (count) => {
+    if (!selectedSlot || count < 1 || count > selectedSlot.remaining) {
+      setErrors((current) => ({ ...current, remotes: `Only ${selectedSlot?.remaining || 0} remote spots remain in this hour.` }))
+      setRemoteEditorOpen(true)
+      return
+    }
+    update({ remotes: count })
+  }
+
+  const selectDuration = (minutes) => {
+    update({ durationMinutes: minutes })
+    setStep(4)
+  }
+
+  const next = () => {
+    const stepErrors = validateStep(step, data, selectedSlot)
+    if (Object.keys(stepErrors).length) {
+      setErrors(stepErrors)
+      return
+    }
+    setStep((current) => Math.min(current + 1, STEPS.length - 1))
   }
 
   const submit = async () => {
-    if (isSubmitting) return
-
-    const validation = validateBookingData(data)
-    if (!validation.isValid) {
-      setErrors(validation.errors)
+    if (submitting) return
+    const validation = validateAll(data, selectedSlot)
+    if (Object.keys(validation).length) {
+      setErrors(validation)
+      setStep(firstInvalidStep(validation))
       return
     }
 
-    const selectedSlot = slots.find(s => s.index === data.slotIndex)
-    const totals = getBookingTotals(data.packageId, data.upgradeId)
-    const { selectedPackage, selectedUpgrade } = totals
-    if (!selectedSlot || selectedSlot.status === 'full' || selectedSlot.available <= 0) {
-      setErrors({ submit: 'This slot is fully booked. Please choose another available slot.' })
-      return
-    }
-    if (!selectedPackage) {
-      setErrors({ submit: 'Please select a package or play option.' })
-      return
-    }
-
-    const bookingData = {
-      name: data.name.trim(),
-      customerName: data.name.trim(),
-      phone: data.phone.trim(),
-      customerPhone: data.phone.trim(),
-      email: data.email.trim(),
-      customerEmail: data.email.trim(),
-      groupSize: Number(data.groupSize),
-      players: Number(data.groupSize),
+    const selectedDuration = DURATIONS.find((item) => item.minutes === data.durationMinutes)
+    const payload = {
       date: formatDateKey(data.date),
       bookingDate: formatDateKey(data.date),
-      slotTime: selectedSlot.startTime || selectedSlot.time,
-      bookingTime: selectedSlot.startTime || selectedSlot.time,
-      packageName: selectedPackage.name,
-      packagePrice: totals.totalPrice,
-      playTime: `${totals.totalPlayTime} Play`,
-      baseDuration: totals.baseDuration,
-      packageDuration: totals.totalDuration,
-      packageDurationMinutes: totals.totalDuration,
-      basePlayTime: totals.basePlayTime,
-      upgradeSelected: selectedUpgrade.name,
-      upgradeName: selectedUpgrade.name,
-      extraDuration: totals.extraDuration,
-      extraPlayTime: totals.extraPlayTime,
-      totalPlayTime: `${totals.totalPlayTime} Play`,
-      basePrice: totals.basePrice,
-      upgradePrice: totals.upgradePrice,
-      totalPrice: totals.totalPrice,
-      bookingStatus: 'Pending Confirmation',
-      adminStatus: 'Pending Confirmation',
-      toastieChoice: data.toastieChoice,
-      coffeeChoice: data.coffeeChoice,
-      toastieSelection: data.toastieChoice,
-      drinkSelection: data.coffeeChoice,
-      adminEmail: RCC_EMAILS[0],
-      staffEmail: RCC_EMAILS[1],
-      notificationEmails: RCC_EMAILS,
-      notificationEmail: RCC_EMAILS.join(','),
-      emailRecipients: RCC_EMAILS.join(','),
+      slot_start: selectedSlot.startTime,
+      slot_end: selectedSlot.endTime,
+      slot_label: selectedSlot.label,
+      slotTime: selectedSlot.startTime,
+      bookingTime: selectedSlot.startTime,
+      group_size: data.remotes,
+      groupSize: data.remotes,
+      players: data.remotes,
+      remoteSpots: data.remotes,
+      duration_minutes: selectedDuration.minutes,
+      packageDuration: selectedDuration.minutes,
+      baseDuration: selectedDuration.minutes,
+      price_per_remote: selectedDuration.price,
+      total_price: totalPrice,
+      totalPrice,
+      packagePrice: totalPrice,
+      packageName: `${selectedDuration.minutes} Minute Gameplay`,
+      playTime: `${selectedDuration.minutes} Minutes`,
+      toastie_selection: data.toastieSelection,
+      toastieSelection: data.toastieSelection,
+      toastieChoice: data.toastieSelection,
+      drink_selection: data.drinkSelection,
+      drinkSelection: data.drinkSelection,
+      coffeeChoice: data.drinkSelection,
+      customer_name: data.customerName.trim(),
+      customerName: data.customerName.trim(),
+      name: data.customerName.trim(),
+      customer_email: data.customerEmail.trim(),
+      customerEmail: data.customerEmail.trim(),
+      email: data.customerEmail.trim(),
+      customer_phone: data.customerPhone.trim(),
+      customerPhone: data.customerPhone.trim(),
+      phone: data.customerPhone.trim(),
       notes: data.notes.trim(),
-      source: 'website'
-    }
-    const bookingSummaryData = {
-      ...bookingData,
-      slotTimeDisplay: selectedSlot.time
+      status: 'pending',
+      bookingStatus: 'pending',
+      source: 'website-v3'
     }
 
-    setIsSubmitting(true)
+    setSubmitting(true)
     setErrors({})
-
     try {
-      const result = await submitBooking(bookingData)
-      const status = result?.status || result?.result || (result?.success ? 'success' : '')
-
-      if (status === 'success') {
-        setSubmittedData({ ...bookingSummaryData, bookingId: result?.bookingId || '' })
-        setSubmitted(true)
-      } else if (status === 'slot_full') {
-        setErrors({ submit: 'This slot is fully booked. Please choose another available slot.' })
-        setSlots((currentSlots) => currentSlots.map((slot) => (
-          slot.time === selectedSlot.time ? { ...slot, available: 0, status: 'full' } : slot
-        )))
-      } else if (status === 'validation_error') {
-        setErrors({ submit: result?.message || 'Please check your booking details and try again.' })
-      } else if (status === 'error') {
-        setErrors({ submit: getFriendlySubmitError(result, bookingData) })
-      } else if (result?.success === false) {
-        setErrors({ submit: result?.message || result?.error || 'Please check your booking details and try again.' })
-      } else {
-        setErrors({ submit: result?.message || 'We could not submit your booking request right now. Please try again or contact RCC.' })
+      let pendingResult = null
+      if (isSupabaseConfigured) {
+        try {
+          pendingResult = await createPendingBooking(payload)
+        } catch {
+          pendingResult = null
+        }
       }
+      const pending = Array.isArray(pendingResult) ? pendingResult[0] : pendingResult
+      let bookingId = pending?.booking_id || ''
+
+      if (pending) {
+        submitBooking({ ...payload, bookingId }).catch(() => {})
+      } else {
+        const sheetResult = await submitBooking(payload)
+        const status = sheetResult?.status || (sheetResult?.success ? 'success' : '')
+        if (status !== 'success') throw new Error(sheetResult?.message || 'Booking request failed.')
+        bookingId = sheetResult.bookingId || ''
+      }
+
+      trackBookingSubmission({
+        booking_date: payload.bookingDate,
+        booking_time: payload.bookingTime,
+        group_size: payload.groupSize,
+        duration_minutes: payload.duration_minutes,
+        total_price: payload.totalPrice
+      })
+      setSubmitted({ ...payload, bookingId })
     } catch (error) {
-      setErrors({ submit: 'We could not submit your booking request right now. Please try again or contact RCC.' })
+      setErrors({ submit: friendlySubmitError(error) })
     } finally {
-      setIsSubmitting(false)
+      setSubmitting(false)
     }
   }
 
-  const reset = () => {
-    setSubmitted(false)
-    setSubmittedData(null)
-    setStep(0)
-    setErrors({})
-    setData({ date: null, slotIndex: null, name: '', phone: '', email: '', groupSize: 1, packageId: '', upgradeId: 'none', toastieChoice: '', coffeeChoice: '', notes: '', confirmAttendance: false })
-  }
+  if (submitted) return <SuccessView booking={submitted} onReset={() => window.location.reload()} />
+
+  const capacityReduced = Boolean(selectedSlot && data.remotes > selectedSlot.remaining)
 
   return (
     <>
-      <PageHero
-        breadcrumbs={['Booking']}
-        eyebrow="Reserve Your Slot"
-        title={<>Book Your <span className="accent">RC Cafe Package</span></>}
-        subtitle="Select a date, pick your package, choose an available slot, and enter your details. Each slot accommodates up to 5 bookings."
-        image="/images/indoor-arena.jpg"
-      />
-
-      <section id="calendar" ref={calendarRef} className="section-light scroll-mt-28 py-12 lg:py-16">
+      <SEO {...PAGE_SEO['/booking']} path="/booking" />
+      <section id="calendar" ref={flowRef} className="scroll-mt-24 bg-[#fffdfa] py-7 sm:py-10">
         <div className="container-x">
-          {submitted ? (
-            <SuccessCard data={submittedData} onReset={reset} />
-          ) : (
-            <div className="grid lg:grid-cols-12 gap-8">
-              <div className="min-w-0 lg:col-span-8">
-                <Stepper step={step} setStep={setStep} />
-                <div className="mt-6 card min-w-0 p-6 sm:p-8 min-h-[420px]">
-                  <div key={step}>
-                    {step === 0 && <StepDate date={data.date} availableDates={availableDates} viewMonth={viewMonth} setViewMonth={setViewMonth} onSelect={(d) => { update({ date: d, slotIndex: null }); setStep(1) }} error={errors.date} />}
-                    {step === 1 && <StepPackage data={data} update={update} />}
-                    {step === 2 && <StepFood data={data} update={update} errors={errors} />}
-                    {step === 3 && <StepTime slots={slots} slotIndex={data.slotIndex} totals={getBookingTotals(data.packageId, data.upgradeId)} onSelect={(i) => { update({ slotIndex: i }); setStep(4) }} isLoading={isLoadingSlots} error={errors.slotIndex || errors.availability} />}
-                    {step === 4 && <StepDetails data={data} update={update} errors={errors} />}
-                    {step === 5 && <StepConfirm data={data} slots={slots} update={update} error={errors.confirmAttendance} />}
-                  </div>
-                </div>
+          <div className="max-w-3xl">
+            <span className="eyebrow"><CalendarDays size={14} />Online Booking</span>
+            <h1 className="mt-3 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-4xl">Book Your Remote Control Cafe Session</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted sm:text-base">Choose a date, select a time slot, pick your remotes and choose your gameplay duration.</p>
+          </div>
 
-                {errors.submit && (
-                  <div className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
-                    <X size={16} /> {errors.submit}
-                  </div>
+          <Progress step={step} onStep={setStep} />
+
+          <div className="mt-5 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+            <main className="min-w-0 rounded-3xl border border-border bg-white p-4 shadow-soft sm:p-6">
+              {step === 0 && <DateStep data={data} viewMonth={viewMonth} setViewMonth={setViewMonth} availableDates={availableDates} onSelect={selectDate} settingsLoading={settingsLoading} settingsError={settingsError} retrySettings={retrySettings} error={errors.date} />}
+              {step === 1 && <SlotStep slots={slots} loading={availabilityLoading} error={availabilityError || errors.slot} onSelect={selectSlot} retry={() => setAvailabilityVersion((value) => value + 1)} />}
+              {step === 2 && <RemoteStep remaining={selectedSlot?.remaining || 0} selected={data.remotes} onSelect={selectRemotes} error={errors.remotes} />}
+              {step === 3 && <DurationStep selected={data.durationMinutes} remotes={data.remotes} onSelect={selectDuration} error={errors.duration} />}
+              {step === 4 && <FoodStep data={data} update={update} errors={errors} />}
+              {step === 5 && <DetailsStep data={data} update={update} errors={errors} remaining={selectedSlot?.remaining || 0} onEditRemotes={editRemotes} onOpenRemoteEditor={() => setRemoteEditorOpen(true)} />}
+              {step === 6 && <ReviewStep error={errors.submit} />}
+
+              {capacityReduced && step >= 3 && (
+                <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold leading-relaxed text-red-700">
+                  Only {selectedSlot.remaining} remotes are now available for this slot. Please reduce your selection to continue.
+                </div>
+              )}
+
+              {step >= 5 && <BookingSummary data={data} slot={selectedSlot} duration={duration} totalPrice={totalPrice} inline collapsible open={mobileSummaryOpen} onToggle={() => setMobileSummaryOpen((value) => !value)} onEditRemotes={() => setRemoteEditorOpen(true)} />}
+
+              <div className="mt-7 flex items-center justify-between border-t border-border pt-5">
+                <button type="button" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0 || submitting} className="btn-outline min-h-12 disabled:cursor-not-allowed disabled:opacity-35"><ArrowLeft size={16} />Back</button>
+                {step < 6 ? (
+                  <button type="button" onClick={next} disabled={step <= 3 || submitting} className={`btn-primary min-h-12 ${step <= 3 ? 'invisible' : ''}`}>Continue <ArrowRight size={16} /></button>
+                ) : (
+                  <button type="button" onClick={submit} disabled={submitting || capacityReduced} className="btn-primary min-h-12 disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <><RefreshCw className="animate-spin" size={17} />Submitting...</> : <><Send size={17} />Submit Booking Request</>}</button>
                 )}
-
-                <div className="mt-5 flex items-center justify-between">
-                  <button
-                    onClick={() => setStep((s) => Math.max(0, s - 1))}
-                    disabled={step === 0}
-                    className="btn-outline disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <ArrowLeft size={16} /> Back
-                  </button>
-                  {step < STEPS.length - 1 ? (
-                    <button
-                      onClick={() => canNext() && setStep((s) => Math.min(STEPS.length - 1, s + 1))}
-                      disabled={!canNext()}
-                      className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {step < 4 ? 'Continue' : 'Review Booking'} <ArrowRight size={16} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={submit}
-                      disabled={isSubmitting}
-                      className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full bg-orange-500 px-7 py-4 text-base font-extrabold text-white shadow-lg shadow-orange-500/30 transition hover:bg-orange-600 hover:shadow-orange-500/45 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[230px]"
-                    >
-                      {isSubmitting ? 'Booking in progress...' : 'Confirm My Booking'} <CheckCircle2 size={18} />
-                    </button>
-                  )}
-                </div>
               </div>
+            </main>
 
-              <aside className="min-w-0 lg:col-span-4">
-                <SummarySidebar data={data} slots={slots} />
-              </aside>
-            </div>
-          )}
+            <BookingSummary data={data} slot={selectedSlot} duration={duration} totalPrice={totalPrice} onEditRemotes={() => setRemoteEditorOpen(true)} />
+          </div>
         </div>
       </section>
 
-      <EventsBookingSection />
+      <RemoteEditorModal open={remoteEditorOpen} selected={data.remotes} remaining={selectedSlot?.remaining || 0} onSelect={editRemotes} onClose={() => setRemoteEditorOpen(false)} />
     </>
   )
 }
 
-function getFriendlySubmitError(result, bookingData) {
-  const rawMessage = String(result?.message || result?.error || '').trim()
-
-  if (!bookingData.phone) {
-    return 'Please enter your phone number'
-  }
-
-  const normalizedMessage = rawMessage.toLowerCase()
-
-  if (normalizedMessage.includes('phone') && normalizedMessage.includes('not defined')) {
-    return 'Unable to submit booking request right now. Please contact us to complete your booking.'
-  }
-
-  return rawMessage || 'Unable to submit booking request right now. Please try again or contact us.'
-}
-
-function EventsBookingSection() {
+function Progress({ step, onStep }) {
   return (
-    <section id="events" className="section-soft py-12 sm:py-16 lg:py-20">
-      <div className="container-x">
-        <div className="max-w-3xl">
-          <span className="eyebrow"><Users size={14} />Events & Groups</span>
-          <h2 className="heading-display mt-4">Events, Parties & <span className="accent">Group Bookings</span></h2>
-          <p className="mt-4 text-muted leading-relaxed">
-            For birthdays, corporate bookings, school visits and special functions, please contact us directly so we can arrange the best package for your group.
-          </p>
-        </div>
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {EVENT_BOOKINGS.map(({ icon: Icon, title, desc }, index) => (
-            <motion.div
-              key={title}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.04 }}
-              className="card card-hover p-5"
-            >
-              <div className="grid h-11 w-11 place-items-center rounded-xl bg-orange-100 text-orange-600">
-                <Icon size={19} />
-              </div>
-              <h3 className="mt-4 font-display text-lg font-extrabold text-charcoal-300">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{desc}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        <div className="mt-8 rounded-2xl border border-orange-200 bg-white p-5 shadow-soft sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-sm font-bold uppercase tracking-widest text-orange-600">Free Venue Hire Available</div>
-              <p className="mt-2 text-sm text-muted">Contact RC Cafe for event booking, group package planning and weekend enquiries.</p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link to="/contact" className="btn-primary">Contact for Event Booking <ArrowRight size={16} /></Link>
-              <a href={`tel:${SITE.phoneTel}`} className="btn-outline"><Phone size={16} /> Call Now</a>
-              <a href={SITE.socials.whatsapp} target="_blank" rel="noreferrer" className="btn-outline">WhatsApp Enquiry</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function getPackageFromParam(value) {
-  if (!value) return null
-  const normalized = value.trim().toLowerCase()
-  return RC_PACKAGES.find((item) => (
-    item.id.toLowerCase() === normalized || item.name.toLowerCase() === normalized
-  )) || null
-}
-
-/* ------------------------------- Stepper -------------------------------- */
-function Stepper({ step, setStep }) {
-  return (
-    <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-2">
-      {STEPS.map((s, i) => {
-        const active = i === step
-        const done = i < step
-        return (
-          <button
-            key={s}
-            onClick={() => i <= step && setStep(i)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-full text-xs font-bold uppercase tracking-widest border transition whitespace-nowrap ${
-              active
-                ? 'bg-orange-500 text-white border-orange-500 shadow-glow'
-                : done
-                ? 'border-orange-300 bg-orange-50 text-orange-700'
-                : 'border-border bg-white text-muted'
-            }`}
-          >
-            <span className={`grid place-items-center w-5 h-5 rounded-full text-[10px] ${active ? 'bg-white text-orange-600' : done ? 'bg-orange-500 text-white' : 'bg-bg-soft text-charcoal-100'}`}>{i + 1}</span>
-            {s}
-          </button>
-        )
-      })}
+    <div className="mt-6 flex max-w-full gap-2 overflow-x-auto pb-2" aria-label="Booking progress">
+      {STEPS.map((label, index) => (
+        <button key={label} type="button" onClick={() => index < step && onStep(index)} disabled={index > step} className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-extrabold uppercase tracking-widest ${index === step ? 'border-orange-500 bg-orange-500 text-white' : index < step ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-border bg-white text-muted'}`}>
+          <span className={`grid h-5 w-5 place-items-center rounded-full ${index === step ? 'bg-white text-orange-600' : 'bg-bg-soft'}`}>{index < step ? <Check size={12} /> : index + 1}</span>{label}
+        </button>
+      ))}
     </div>
   )
 }
 
-/* ------------------------------ Step 0: Date ----------------------------- */
-function StepDate({ date, availableDates, viewMonth, setViewMonth, onSelect, error }) {
+function DateStep({ data, viewMonth, setViewMonth, availableDates, onSelect, settingsLoading, settingsError, retrySettings, error }) {
   const today = getAucklandToday()
-  const monthName = viewMonth.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' })
   const firstDay = startOfMonth(viewMonth).getDay()
   const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate()
-  const cells = []
-  for (let i = 0; i < firstDay; i++) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d))
-
+  const cells = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, index) => new Date(viewMonth.getFullYear(), viewMonth.getMonth(), index + 1))]
   return (
     <div>
-      <Heading title="Select a Date" sub="We're open Monday to Friday. Select your preferred day." />
+      <StepHeading icon={CalendarDays} title="Select Date" text="Online bookings are available Monday to Sunday." />
+      {settingsLoading && <InlineNotice>Loading live booking settings...</InlineNotice>}
+      {settingsError && <InlineNotice>{settingsError} <button onClick={retrySettings} className="font-bold underline">Retry</button></InlineNotice>}
       <div className="mt-6 max-w-md">
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={() => setViewMonth(addMonths(viewMonth, -1))} className="grid place-items-center w-9 h-9 rounded-md border border-border bg-white hover:border-orange-500 hover:text-orange-600"><ChevronLeft size={16} /></button>
-          <div className="font-display text-xl font-extrabold text-charcoal-300">{monthName}</div>
-          <button onClick={() => setViewMonth(addMonths(viewMonth, 1))} className="grid place-items-center w-9 h-9 rounded-md border border-border bg-white hover:border-orange-500 hover:text-orange-600"><ChevronRight size={16} /></button>
+        <div className="flex items-center justify-between">
+          <button type="button" onClick={() => setViewMonth(addMonths(viewMonth, -1))} className="grid h-12 w-12 place-items-center rounded-xl border border-border bg-white"><ChevronLeft size={17} /></button>
+          <div className="font-display text-xl font-extrabold">{viewMonth.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' })}</div>
+          <button type="button" onClick={() => setViewMonth(addMonths(viewMonth, 1))} className="grid h-12 w-12 place-items-center rounded-xl border border-border bg-white"><ChevronRight size={17} /></button>
         </div>
-        <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-widest text-muted mb-2 font-bold">
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => <div key={d}>{d}</div>)}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((c, i) => {
-            if (!c) return <div key={i} />
-            const past = c < today
-            const isAvailable = availableDates.some(d => isSameDay(d, c))
-            const selected = isSameDay(c, date)
-            return (
-              <button
-                key={i}
-                disabled={past || !isAvailable}
-                onClick={() => onSelect(c)}
-                className={`aspect-square rounded-md text-sm font-semibold transition border ${
-                  selected ? 'bg-orange-500 border-orange-500 text-white shadow-glow' : past || !isAvailable ? 'border-transparent text-muted/40 cursor-not-allowed' : 'border-border bg-white text-charcoal-300 hover:border-orange-500 hover:text-orange-600'
-                }`}
-              >
-                {c.getDate()}
-              </button>
-            )
+        <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold uppercase tracking-widest text-muted">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((day) => <div key={day}>{day}</div>)}</div>
+        <div className="mt-2 grid grid-cols-7 gap-1">
+          {cells.map((date, index) => {
+            if (!date) return <div key={`blank-${index}`} />
+            const enabled = availableDates.some((item) => sameDay(item, date))
+            const selected = sameDay(data.date, date)
+            const past = date < today
+            return <button key={date.toISOString()} type="button" disabled={!enabled || past} onClick={() => onSelect(date)} className={`aspect-square rounded-xl border text-sm font-bold transition ${selected ? 'border-orange-500 bg-orange-500 text-white shadow-glow' : enabled && !past ? 'border-border bg-white hover:border-orange-400 hover:text-orange-700' : 'cursor-not-allowed border-transparent text-muted/35'}`}>{date.getDate()}</button>
           })}
         </div>
-        {date && (
-          <div className="mt-4 rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-sm text-charcoal-300">
-            Selected: <span className="font-bold text-orange-700">{formatDateDisplay(date)}</span>
-          </div>
-        )}
-        {error && <p className="mt-3 text-xs font-semibold text-red-600">{error}</p>}
-        <p className="mt-3 text-xs text-muted">Operating days: Monday-Friday only</p>
-        <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 p-4 shadow-sm">
-          <div className="text-[11px] font-extrabold uppercase tracking-widest text-orange-700">Special Booking Notice</div>
-          <p className="mt-2 text-sm leading-relaxed text-charcoal-300">
-            Weekend bookings, School Holiday sessions, Public Holidays, Corporate Events, Private Functions and Group Bookings are managed separately and are not currently available through online booking.
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-charcoal-300">
-            Please contact Remote Control Cafe directly and our team will assist with availability and reservations.
-          </p>
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <a href={`tel:${SITE.phoneTel}`} className="btn-primary !py-2.5"><Phone size={16} /> Call RCC</a>
-            <a href={`mailto:${RCC_EMAIL}`} className="btn-outline !py-2.5"><Mail size={16} /> Email RCC</a>
-          </div>
-        </div>
+        {data.date && <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm">Selected: <strong>{formatDateDisplay(data.date)}</strong></div>}
+        {error && <ErrorText>{error}</ErrorText>}
       </div>
     </div>
   )
 }
 
-/* ----------------------------- Step 2: Time ------------------------------ */
-function StepTime({ slots, slotIndex, totals, onSelect, isLoading, error }) {
-  const selectedPackage = totals.selectedPackage
-  const isAvailabilityWarning = error?.startsWith('We could not verify live availability')
-
+function SlotStep({ slots, loading, error, onSelect, retry }) {
   return (
     <div>
-      <Heading
-        title="Select Time Slot"
-        sub={selectedPackage ? `${selectedPackage.name} runs for ${totals.totalDuration} minutes. Each slot can accommodate up to 5 bookings.` : 'Please select a package first.'}
-      />
-      {isLoading && <p className="mt-4 text-sm font-semibold text-orange-700">Checking live availability...</p>}
-      {error && (
-        <div className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
-          isAvailabilityWarning
-            ? 'border-orange-200 bg-orange-50 text-orange-800'
-            : 'border-red-200 bg-red-50 text-red-700'
-        }`}>
-          {error}
-        </div>
-      )}
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <StepHeading icon={Clock3} title="Select 1-Hour Time Slot" text="Choose one fixed hour. Gameplay duration is selected in the next steps." />
+      {loading && <InlineNotice>Checking approved remote reservations...</InlineNotice>}
+      {error && <InlineNotice>{error} <button type="button" onClick={retry} className="font-bold underline">Retry</button></InlineNotice>}
+      <div className="mt-6 grid grid-cols-2 gap-3">
         {slots.map((slot) => {
-          const selected = slotIndex === slot.index
-          const isFull = slot.status === 'full' || slot.available === 0
-          const statusColor = slot.status === 'available' ? 'bg-green-50 border-green-300 text-green-700' : slot.status === 'almost-full' ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-red-50 border-red-300 text-red-700'
-          
+          const full = slot.remaining <= 0
           return (
-            <button
-              key={slot.index}
-              disabled={isFull}
-              onClick={() => !isFull && onSelect(slot.index)}
-              className={`rounded-xl border p-4 text-left transition ${
-                selected 
-                  ? 'border-orange-500 bg-orange-50 shadow-glow' 
-                  : isFull 
-                    ? 'border-border bg-bg-soft opacity-60 cursor-not-allowed'
-                    : 'border-border bg-white hover:border-orange-300'
-              }`}
-            >
-              <div className="font-display text-lg font-extrabold text-charcoal-300">{slot.time}</div>
-              <div className="mt-1 text-xs font-semibold uppercase tracking-widest text-muted">{slot.durationMinutes} minutes</div>
-              <div className={`mt-2 text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-md inline-block ${statusColor}`}>
-                {isFull ? 'Fully Booked' : slot.available === 1 ? '1 Spot Left' : `${slot.available} Spots Left`}
-              </div>
+            <button key={slot.startTime} type="button" disabled={full} onClick={() => onSelect(slot)} className={`min-h-28 min-w-0 rounded-2xl border p-3 text-left transition sm:p-4 ${full ? 'cursor-not-allowed border-red-200 bg-red-50/70 opacity-70' : 'border-border bg-white hover:-translate-y-0.5 hover:border-orange-400 hover:shadow-soft'}`}>
+              <div className="min-w-0"><div className="font-display text-sm font-extrabold leading-snug text-charcoal-300 sm:text-lg">{slot.label}</div><div className="mt-1 hidden text-xs font-semibold text-muted sm:block">Fixed 1-hour booking slot</div></div>
+              <span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider sm:text-[10px] ${full ? 'bg-red-100 text-red-700' : slot.remaining <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{full ? 'Fully Booked' : `${slot.remaining} left`}</span>
+              {full && <p className="mt-3 text-xs leading-relaxed text-red-700">All 8 remotes are already reserved for this hour.</p>}
             </button>
           )
         })}
       </div>
-      {slots.length === 0 && (
-        <div className="mt-4 rounded-xl border border-border bg-bg-soft p-4 text-center text-muted">
-          {selectedPackage ? 'No slots available for this date. Please select another day.' : 'Select a package before choosing a slot.'}
-        </div>
-      )}
+      <EnquiryNote />
     </div>
   )
 }
 
-/* ---------------------------- Step 1: Package ---------------------------- */
-function StepPackage({ data, update }) {
-  const totals = getBookingTotals(data.packageId, data.upgradeId)
-
+function RemoteStep({ remaining, selected, onSelect, error }) {
   return (
     <div>
-      <Heading title="Select Package" sub="Choose your RC play package. Every package includes any toastie and any hot coffee." />
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        {RC_PACKAGES.map((item) => {
-          const selected = data.packageId === item.id
-          return (
-            <button
-              key={item.id}
-              onClick={() => update({ packageId: item.id, upgradeId: 'none', slotIndex: null, toastieChoice: '', coffeeChoice: '' })}
-              className={`relative min-h-[230px] overflow-hidden rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 ${
-                selected
-                  ? 'border-orange-500 bg-orange-50 shadow-glow ring-2 ring-orange-100'
-                  : item.badge
-                    ? 'border-orange-300 bg-white shadow-soft hover:border-orange-500 hover:shadow-glow'
-                    : 'border-border bg-white shadow-soft hover:border-orange-300 hover:shadow-card'
-              }`}
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-400 via-orange-500 to-charcoal-300" />
-              {item.badge && <span className="absolute right-3 top-4 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-glow">{item.badge}</span>}
-              <div className="pr-20">
-                <div className="font-display text-xl font-extrabold text-charcoal-300">{item.name}</div>
-                <div className="mt-1 text-sm font-bold uppercase tracking-widest text-orange-700">{item.playTime}</div>
-              </div>
-              <div className="mt-5 grid gap-2 text-sm text-charcoal-300">
-                <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-600" /> Any Toastie</div>
-                <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-600" /> Any Hot Coffee</div>
-              </div>
-              <div className="mt-7 flex items-end justify-between gap-4">
-                <span className="text-xs font-bold uppercase tracking-widest text-muted">{item.durationMinutes} minute session</span>
-                <span className="font-display text-3xl font-extrabold text-orange-600">${item.price}</span>
-              </div>
-              {selected && (
-                <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-bold text-green-700">
-                  <CheckCircle2 size={14} /> Selected
-                </div>
-              )}
-            </button>
-          )
+      <StepHeading icon={Gamepad2} title="Select Number of Remotes" text="1 person = 1 remote. Each time slot supports up to 8 remotes." />
+      <div className="mt-6 grid grid-cols-4 gap-3 lg:grid-cols-8">
+        {Array.from({ length: 8 }, (_, index) => index + 1).map((count) => {
+          const disabled = count > remaining
+          const active = selected === count
+          return <button key={count} type="button" disabled={disabled} onClick={() => onSelect(count)} aria-label={`${count} remotes`} className={`relative flex aspect-square min-w-0 flex-col items-center justify-center rounded-2xl border transition ${active ? 'border-orange-500 bg-orange-500 text-white shadow-glow' : disabled ? 'cursor-not-allowed border-red-100 bg-red-50 text-red-300' : 'border-border bg-white text-charcoal-300 hover:border-orange-400 hover:bg-orange-50'}`}>{disabled && <Lock className="absolute right-2 top-2" size={12} />}<Gamepad2 size={22} /><span className="mt-1 text-sm font-extrabold">{count}</span></button>
         })}
       </div>
-
-      {totals.selectedPackage && (
-        <div className="mt-7 rounded-3xl border border-orange-200 bg-orange-50/60 p-4 shadow-soft sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-orange-600">Optional</div>
-              <h3 className="font-display text-xl font-extrabold text-charcoal-300">Upgrade Your Play Time</h3>
-              <p className="mt-1 text-sm text-muted">Add extra RC play time to your selected package.</p>
-            </div>
-            <div className="rounded-full bg-white px-4 py-2 text-sm font-extrabold text-charcoal-300 shadow-sm">
-              Total: {totals.totalPlayTime} | ${totals.totalPrice}
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {PLAY_UPGRADES.map((upgrade) => {
-              const selected = data.upgradeId === upgrade.id
-              const price = upgrade.price === 0 ? '$0' : `+$${upgrade.price}`
-
-              return (
-                <button
-                  key={upgrade.id}
-                  type="button"
-                  onClick={() => update({ upgradeId: upgrade.id, slotIndex: null })}
-                  className={`rounded-2xl border p-4 text-left transition ${
-                    selected
-                      ? 'border-orange-500 bg-white shadow-glow'
-                      : 'border-orange-100 bg-white hover:border-orange-300 hover:shadow-soft'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="font-display text-base font-extrabold text-charcoal-300">{upgrade.name}</div>
-                    {selected && <CheckCircle2 size={18} className="flex-shrink-0 text-green-600" />}
-                  </div>
-                  <div className="mt-2 text-xs font-bold uppercase tracking-widest text-muted">{upgrade.summary}</div>
-                  <div className="mt-3 text-2xl font-extrabold text-orange-600">{price}</div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      <div className="mt-4 text-sm font-extrabold text-orange-700">{selected || 0} Remote{selected === 1 ? '' : 's'} Selected</div>
+      {error && <ErrorText>{error}</ErrorText>}
+      <EnquiryNote />
     </div>
   )
 }
 
-/* ---------------------------- Step 2: Food ---------------------------- */
-function StepFood({ data, update, errors }) {
+function DurationStep({ selected, remotes, onSelect, error }) {
   return (
     <div>
-      <Heading
-        title="Choose Your Food & Drink"
-        sub="Your selection helps our team prepare everything before your arrival."
-      />
-
-      <ChoiceGroup
-        title="Toastie Selection"
-        required
-        options={TOASTIE_CHOICES}
-        value={data.toastieChoice}
-        onSelect={(value) => update({ toastieChoice: value })}
-        error={errors.toastieChoice}
-      />
-
-      <ChoiceGroup
-        title="Drink Selection"
-        required
-        options={COFFEE_CHOICES}
-        value={data.coffeeChoice}
-        onSelect={(value) => update({ coffeeChoice: value })}
-        error={errors.coffeeChoice}
-      />
-    </div>
-  )
-}
-
-function ChoiceGroup({ title, required, options, value, onSelect, error }) {
-  return (
-    <div className="mt-6">
-      <div className="flex items-center gap-2">
-        <h3 className="font-display text-lg font-extrabold text-charcoal-300">{title}</h3>
-        {required && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-orange-700">Required</span>}
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        {options.map((option) => {
-          const selected = value === option
-          return (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onSelect(option)}
-              className={`rounded-2xl border p-4 text-left text-sm font-bold transition ${
-                selected
-                  ? 'border-orange-500 bg-orange-50 text-charcoal-300 shadow-glow'
-                  : 'border-border bg-white text-charcoal-300 hover:border-orange-300 hover:shadow-soft'
-              }`}
-            >
-              <span className="flex items-center justify-between gap-3">
-                {option}
-                {selected && <CheckCircle2 size={18} className="flex-shrink-0 text-green-600" />}
-              </span>
-            </button>
-          )
+      <StepHeading icon={Clock3} title="Select Gameplay Duration" text="Both gameplay options take place inside your selected 1-hour booking slot." />
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {DURATIONS.map((option) => {
+          const active = selected === option.minutes
+          return <button key={option.minutes} type="button" onClick={() => onSelect(option.minutes)} className={`rounded-3xl border p-5 text-left transition ${active ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-100' : 'border-border bg-white hover:border-orange-300'}`}><div className="flex items-start justify-between gap-3"><div><div className="font-display text-2xl font-extrabold">{option.minutes} Minutes</div><div className="mt-1 text-sm font-bold text-orange-700">${option.price} per remote</div></div>{active && <CheckCircle2 className="text-green-600" size={22} />}</div><div className="mt-4 space-y-2 text-sm text-charcoal-300"><div className="flex items-center gap-2"><Sandwich size={16} className="text-orange-600" />Includes Any Toastie</div><div className="flex items-center gap-2"><Coffee size={16} className="text-orange-600" />Includes Any Hot Coffee</div></div>{remotes > 0 && <div className="mt-4 border-t border-border pt-3 text-sm font-extrabold">{remotes} x ${option.price} = ${remotes * option.price}</div>}</button>
         })}
       </div>
-      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+      {error && <ErrorText>{error}</ErrorText>}
+      <InlineNotice>{ADD_ON_COPY}</InlineNotice>
     </div>
   )
 }
 
-/* ---------------------------- Step 4: Details ---------------------------- */
-function StepDetails({ data, update, errors }) {
+function FoodStep({ data, update, errors }) {
   return (
     <div>
-      <Heading title="Your Details" sub="We'll use these to confirm your booking." />
-      <div className="mt-6 grid sm:grid-cols-2 gap-4">
-        <Field label="Full Name" icon={User} value={data.name} onChange={(v) => update({ name: v })} required error={errors.name} />
-        <Field label="Email Address" icon={Mail} value={data.email} onChange={(v) => update({ email: v })} type="email" required error={errors.email} />
-        <Field label="Mobile Number" icon={Phone} value={data.phone} onChange={(v) => update({ phone: v })} required error={errors.phone} placeholder="021 123 4567" />
-        <Field label="Number of Players" icon={Users} value={data.groupSize} onChange={(v) => update({ groupSize: v.replace(/\D/g, '') || '1' })} type="number" required error={errors.groupSize} min="1" max="20" />
-        <TextArea label="Notes / Special Request" icon={MessageSquare} value={data.notes} onChange={(v) => update({ notes: v })} className="sm:col-span-2" />
-      </div>
-      <p className="mt-4 text-xs text-muted">All fields are required. No machine or game selection is needed.</p>
+      <StepHeading icon={Sandwich} title="Choose Your Included Food & Drink" text="Choose one toastie and one hot drink so the RCC team can prepare for your visit." />
+      <ChoiceGrid title="Toastie Selection" icon={Sandwich} options={TOASTIE_CHOICES} value={data.toastieSelection} onChange={(value) => update({ toastieSelection: value })} error={errors.toastie} />
+      <ChoiceGrid title="Hot Coffee Selection" icon={Coffee} options={COFFEE_CHOICES} value={data.drinkSelection} onChange={(value) => update({ drinkSelection: value })} error={errors.drink} />
     </div>
   )
 }
 
-/* ---------------------------- Step 4: Confirm ---------------------------- */
-function StepConfirm({ data, slots, update, error }) {
-  const selectedSlot = slots.find(s => s.index === data.slotIndex)
-  const totals = getBookingTotals(data.packageId, data.upgradeId)
-  const selectedPackage = totals.selectedPackage
+function ChoiceGrid({ title, icon: Icon, options, value, onChange, error }) {
+  return <div className="mt-6"><div className="flex items-center gap-2 text-sm font-extrabold"><Icon size={17} className="text-orange-600" />{title} <span className="text-red-500">*</span></div><div className="mt-3 grid gap-3 sm:grid-cols-2">{options.map((option) => <button key={option} type="button" onClick={() => onChange(option)} className={`flex min-h-12 items-center justify-between rounded-xl border px-4 text-left text-sm font-bold transition ${value === option ? 'border-orange-500 bg-orange-50 text-orange-800' : 'border-border bg-white hover:border-orange-300'}`}><span>{option}</span>{value === option && <CheckCircle2 size={18} className="text-green-600" />}</button>)}</div>{error && <ErrorText>{error}</ErrorText>}</div>
+}
+
+function DetailsStep({ data, update, errors, remaining, onEditRemotes, onOpenRemoteEditor }) {
   return (
     <div>
-      <Heading title="Booking Summary" sub="Please review your details before confirming your booking." />
-
-      <div className="mt-6 overflow-hidden rounded-3xl border border-orange-200 bg-white shadow-soft">
-        <div className="bg-gradient-to-r from-orange-500 to-charcoal-300 px-5 py-4 text-white">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/80">Premium Reservation Summary</div>
-          <div className="mt-1 font-display text-2xl font-extrabold">{selectedPackage?.name || 'RCC Package'}</div>
-        </div>
-        <div className="p-4 sm:p-5">
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <PremiumSummaryRow icon={Calendar} label="Date" value={formatDateDisplay(data.date)} />
-          <PremiumSummaryRow icon={Clock} label="Selected Time" value={selectedSlot?.time || '-'} />
-          <PremiumSummaryRow icon={Coffee} label="Selected Package" value={selectedPackage ? `${selectedPackage.name} - ${totals.basePlayTime}` : '-'} />
-          <PremiumSummaryRow icon={Clock} label="Extra Play Time" value={totals.extraPlayTime || '-'} />
-          <PremiumSummaryRow icon={Clock} label="Total Play Time" value={totals.totalPlayTime || '-'} />
-          <PremiumSummaryRow icon={Cake} label="Selected Toastie" value={data.toastieChoice || '-'} />
-          <PremiumSummaryRow icon={Coffee} label="Selected Drink" value={data.coffeeChoice || '-'} />
-          <PremiumSummaryRow icon={Users} label="Number of Players" value={data.groupSize || '-'} />
-          <PremiumSummaryRow icon={User} label="Customer Name" value={data.name} />
-          <PremiumSummaryRow icon={Phone} label="Phone Number" value={data.phone} />
-          <PremiumSummaryRow icon={Gift} label="Total Price" value={selectedPackage ? `$${totals.totalPrice}` : '-'} />
-        </div>
-        {data.notes && (
-          <div className="mt-3 rounded-xl border border-border bg-bg-soft p-3 text-sm text-charcoal-300">
-            <span className="font-bold text-muted">Notes: </span>{data.notes}
-          </div>
-        )}
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <InfoListCard title="Why Book With Us?" items={TRUST_ITEMS} />
-        <InfoListCard title="Important Information" items={IMPORTANT_INFO} subtle />
-      </div>
-
-      <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border bg-white p-4 text-sm leading-relaxed shadow-soft transition ${data.confirmAttendance ? 'border-orange-300 bg-orange-50' : 'border-border hover:border-orange-200'}`}>
-        <input
-          type="checkbox"
-          checked={data.confirmAttendance}
-          onChange={(event) => update({ confirmAttendance: event.target.checked })}
-          className="mt-1 h-5 w-5 flex-shrink-0 accent-orange-500"
-        />
-        <span className="font-medium text-charcoal-300">
-          I confirm that all booking details are correct.
-        </span>
-      </label>
-      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
-
-      <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-        No advance payment required. Our team will contact you to confirm the booking.
+      <StepHeading icon={User} title="Customer Details" text="We will use these details to review and confirm your booking request." />
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <Field label="Full Name" icon={User} value={data.customerName} onChange={(value) => update({ customerName: value })} error={errors.name} />
+        <Field label="Email" icon={Mail} type="email" value={data.customerEmail} onChange={(value) => update({ customerEmail: value })} error={errors.email} />
+        <Field label="Phone" icon={Phone} value={data.customerPhone} onChange={(value) => update({ customerPhone: value })} error={errors.phone} />
+        <div><label className="field-label">Selected Remotes</label><RemoteQuantityControl value={data.remotes} remaining={remaining} onChange={onEditRemotes} onEdit={onOpenRemoteEditor} /></div>
+        <label className="sm:col-span-2"><span className="field-label">Notes / Special Request <span className="font-normal text-muted">(optional)</span></span><div className="relative"><MessageSquare className="absolute left-3 top-3 text-muted" size={17} /><textarea rows={4} value={data.notes} onChange={(event) => update({ notes: event.target.value })} className="field-input resize-y pl-10 text-base" /></div></label>
       </div>
     </div>
   )
 }
 
-/* ------------------------- Sidebar / Success ----------------------------- */
-function SummarySidebar({ data, slots }) {
-  const selectedSlot = slots.find(s => s.index === data.slotIndex)
-  const totals = getBookingTotals(data.packageId, data.upgradeId)
-  const selectedPackage = totals.selectedPackage
+function Field({ label, icon: Icon, type = 'text', value, onChange, error }) {
+  return <label><span className="field-label">{label} <span className="text-red-500">*</span></span><div className="relative"><Icon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={17} /><input type={type} value={value} onChange={(event) => onChange(event.target.value)} className={`field-input pl-10 text-base ${error ? 'border-red-400' : ''}`} /></div>{error && <ErrorText>{error}</ErrorText>}</label>
+}
+
+function ReviewStep({ error }) {
+  return <div><StepHeading icon={CheckCircle2} title="Review & Submit" text="Check your selections before sending the request to the RCC team." />{error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}</div>
+}
+
+function BookingSummary({ data, slot, duration, totalPrice, inline = false, collapsible = false, open = true, onToggle, onEditRemotes }) {
+  const contentVisible = !collapsible || open
   return (
-    <div className="sticky top-28 card p-6">
-      <div className="text-[11px] uppercase tracking-widest text-orange-600 font-bold">Booking Summary</div>
-      <div className="mt-4 space-y-3 text-sm">
-        <SidebarLine label="Date" value={data.date ? formatDateDisplay(data.date) : '-'} />
-        <SidebarLine label="Package" value={selectedPackage?.name || '-'} />
-        <SidebarLine label="Base Play" value={totals.basePlayTime || '-'} />
-        <SidebarLine label="Extra Play" value={selectedPackage ? totals.extraPlayTime : '-'} />
-        <SidebarLine label="Total Play" value={totals.totalPlayTime || '-'} />
-        <SidebarLine label="Total Price" value={selectedPackage ? `$${totals.totalPrice}` : '-'} />
-        <SidebarLine label="Toastie" value={data.toastieChoice || '-'} />
-        <SidebarLine label="Drink" value={data.coffeeChoice || '-'} />
-        <SidebarLine label="Slot" value={selectedSlot?.time || '-'} />
-        <SidebarLine label="Players" value={data.groupSize || '-'} />
-        <SidebarLine label="Name" value={data.name || '-'} />
-        <SidebarLine label="Phone" value={data.phone || '-'} />
-      </div>
-      {selectedSlot && (
-        <div className="mt-5 rounded-xl bg-bg-soft border border-border p-4">
-          <div className="text-xs uppercase tracking-widest text-muted font-bold">Availability</div>
-          <div className={`mt-2 text-sm font-bold ${
-            selectedSlot.status === 'available' ? 'text-green-600' : selectedSlot.status === 'almost-full' ? 'text-orange-600' : 'text-red-600'
-          }`}>
-            {selectedSlot.available} of {selectedSlot.maxCapacity} spots available
-          </div>
-        </div>
-      )}
-      <Link to="/menu" className="btn-outline mt-4 w-full">Browse Cafe Menu</Link>
-    </div>
+    <aside className={`${inline ? 'mt-6 lg:hidden' : 'hidden lg:block lg:sticky lg:top-28'} min-w-0 rounded-3xl border border-orange-200 bg-white p-5 shadow-card`}>
+      {collapsible ? (
+        <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-12 w-full items-center justify-between gap-4 text-left">
+          <span><span className="block text-[10px] font-extrabold uppercase tracking-widest text-orange-600">Your RCC Session</span><span className="mt-1 block font-display text-xl font-extrabold">Booking Summary</span></span>
+          <ChevronDown size={20} className={`shrink-0 text-orange-600 transition ${open ? 'rotate-180' : ''}`} />
+        </button>
+      ) : <><div className="text-[10px] font-extrabold uppercase tracking-widest text-orange-600">Live Booking Summary</div><h2 className="mt-2 font-display text-xl font-extrabold">Your RCC Session</h2></>}
+      {contentVisible && <div className="mt-5 space-y-3 text-sm">
+        <SummaryRow label="Date" value={data.date ? formatDateDisplay(data.date) : 'Not selected'} />
+        <SummaryRow label="Time" value={slot?.label || 'Not selected'} />
+        <div className="flex items-center justify-between gap-4"><span className="text-muted">Remotes</span><span className="flex items-center gap-2"><strong>{data.remotes || 'Not selected'}</strong>{data.remotes > 0 && <button type="button" onClick={onEditRemotes} className="min-h-10 rounded-full border border-orange-200 px-3 text-xs font-extrabold text-orange-700 transition hover:bg-orange-50">Edit</button>}</span></div>
+        <SummaryRow label="Gameplay" value={duration ? `${duration.minutes} Minutes` : 'Not selected'} />
+        <SummaryRow label="Included" value="Any Toastie + Any Hot Coffee" />
+        <SummaryRow label="Toastie" value={data.toastieSelection || 'Not selected'} />
+        <SummaryRow label="Coffee" value={data.drinkSelection || 'Not selected'} />
+        <div className="mt-5 flex items-end justify-between border-t border-border pt-4"><span className="text-xs font-extrabold uppercase tracking-widest text-muted">Total</span><span className="font-display text-3xl font-extrabold text-orange-600">${totalPrice}</span></div>
+        {duration && data.remotes > 0 && <div className="mt-1 text-right text-xs text-muted">{data.remotes} x ${duration.price} per remote</div>}
+        <div className="mt-5 rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs leading-relaxed text-charcoal-300"><strong>Status: Pending Confirmation</strong><br />Your booking request will be reviewed by our team. Once approved, your slot will be confirmed.</div>
+        <p className="mt-4 text-xs leading-relaxed text-muted">{ADD_ON_COPY}</p>
+        <div className="mt-4 border-t border-border pt-4"><p className="text-xs leading-relaxed text-muted">{ENQUIRY_COPY}</p><Link to="/contact" className="btn-outline mt-3 min-h-12 w-full">Send Enquiry</Link></div>
+      </div>}
+    </aside>
   )
 }
 
-function SidebarLine({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-muted text-xs uppercase tracking-widest font-bold">{label}</span>
-      <span className="text-charcoal-300 font-semibold text-right truncate max-w-[60%]">{value}</span>
-    </div>
-  )
+function RemoteQuantityControl({ value, remaining, onChange, onEdit }) {
+  return <div className="mt-1.5 flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-border bg-bg-soft px-2"><button type="button" onClick={() => onChange(value - 1)} disabled={value <= 1} aria-label="Decrease remotes" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-white text-charcoal-300 disabled:opacity-35"><Minus size={17} /></button><button type="button" onClick={onEdit} className="min-h-10 min-w-0 flex-1 text-center font-extrabold text-charcoal-300"><Gamepad2 size={17} className="mr-2 inline text-orange-600" />{value} Remote{value === 1 ? '' : 's'} <span className="ml-1 text-xs text-orange-700">Edit</span></button><button type="button" onClick={() => onChange(value + 1)} disabled={value >= remaining} aria-label="Increase remotes" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-white text-charcoal-300 disabled:opacity-35"><Plus size={17} /></button></div>
 }
 
-function SuccessCard({ data, onReset }) {
-  const date = data?.date ? new Date(`${data.date}T00:00:00`) : null
-  return (
-    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto text-center card p-6 sm:p-10">
-      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-orange-100 text-3xl">🎉</div>
-      <h2 className="font-display text-2xl sm:text-3xl font-extrabold mt-4 text-charcoal-300">Booking Request Received!</h2>
-      <p className="mt-3 text-muted text-sm sm:text-base">Thank you for choosing Remote Control Cafe.</p>
-      <p className="mt-3 text-sm leading-relaxed text-charcoal-300 sm:text-base">
-        Our team will contact you shortly via WhatsApp or phone call to confirm your selected session.
-      </p>
-      <p className="mt-3 text-sm font-semibold text-charcoal-300 sm:text-base">
-        Please keep your phone available for confirmation.
-      </p>
-      <p className="mt-2 text-sm text-muted sm:text-base">We look forward to seeing you soon!</p>
-      <div className="mt-6 rounded-xl border border-border bg-bg-soft p-4 sm:p-5 text-left text-sm space-y-2">
-        <div className="flex justify-between gap-4"><span className="text-muted">Booking ID</span><span className="font-semibold text-charcoal-300 text-right">{data.bookingId || '-'}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Name</span><span className="font-semibold text-charcoal-300">{data.name}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Date</span><span className="font-semibold text-charcoal-300">{formatDateDisplay(date)}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Slot Time</span><span className="font-semibold text-charcoal-300">{data.slotTimeDisplay || data.slotTime}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Package</span><span className="font-semibold text-charcoal-300">{data.packageName}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Base Play Time</span><span className="font-semibold text-charcoal-300">{data.basePlayTime || '-'}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Extra Play Time</span><span className="font-semibold text-charcoal-300">{data.extraPlayTime || '-'}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Total Play Time</span><span className="font-semibold text-charcoal-300">{data.totalPlayTime || data.playTime}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Toastie</span><span className="font-semibold text-charcoal-300">{data.toastieSelection || data.toastieChoice || '-'}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Drink</span><span className="font-semibold text-charcoal-300">{data.drinkSelection || data.coffeeChoice || '-'}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Group Size</span><span className="font-semibold text-charcoal-300">{data.groupSize}</span></div>
-        <div className="flex justify-between"><span className="text-muted">Total Price</span><span className="font-semibold text-charcoal-300">${data.totalPrice ?? data.packagePrice}</span></div>
-        <div className="rounded-lg bg-white px-3 py-2 text-sm text-charcoal-300">
-          <span className="font-bold text-orange-700">Your food & drink selection:</span> Our team will prepare your selected items before your visit.
-        </div>
-      </div>
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <Link to="/" className="btn-primary">Return to Home</Link>
-        <button onClick={onReset} className="btn-outline">Book Another Session</button>
-      </div>
-    </motion.div>
-  )
+function RemoteEditorModal({ open, selected, remaining, onSelect, onClose }) {
+  if (!open) return null
+  return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="remote-editor-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="w-full max-w-md rounded-3xl border border-orange-200 bg-white p-5 shadow-2xl sm:p-6"><div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-extrabold uppercase tracking-widest text-orange-600">Edit Booking</div><h2 id="remote-editor-title" className="mt-1 font-display text-2xl font-extrabold">Select Number of Remotes</h2><p className="mt-2 text-sm text-muted">Up to {remaining} remote{remaining === 1 ? '' : 's'} currently available.</p></div><button type="button" onClick={onClose} aria-label="Close remote editor" className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-border bg-white"><X size={20} /></button></div>{remaining > 0 ? <div className="mt-6 grid grid-cols-4 gap-3">{Array.from({ length: 8 }, (_, index) => index + 1).map((count) => { const disabled = count > remaining; const active = count === selected; return <button key={count} type="button" disabled={disabled} onClick={() => { onSelect(count); onClose() }} className={`relative flex aspect-square min-h-14 items-center justify-center rounded-2xl border text-lg font-extrabold transition ${active ? 'border-orange-500 bg-orange-500 text-white shadow-glow' : disabled ? 'cursor-not-allowed border-red-100 bg-red-50 text-red-300' : 'border-border bg-white hover:border-orange-400 hover:bg-orange-50'}`}>{disabled && <Lock className="absolute right-1.5 top-1.5" size={11} />}{count}</button> })}</div> : <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">This slot is now fully booked. Please return to the time step and select another slot.</div>}<button type="button" onClick={onClose} className="btn-outline mt-6 min-h-12 w-full">Done</button></div></div>
 }
 
-/* ----------------------------- Small bits -------------------------------- */
-function Heading({ title, sub }) {
-  return (
-    <div>
-      <h2 className="font-display text-2xl font-extrabold text-charcoal-300">{title}</h2>
-      {sub && <p className="mt-1.5 text-sm text-muted max-w-xl">{sub}</p>}
-    </div>
-  )
+function SummaryRow({ label, value }) {
+  return <div className="flex items-start justify-between gap-4"><span className="shrink-0 text-muted">{label}</span><span className="min-w-0 text-right font-bold text-charcoal-300">{value}</span></div>
 }
 
-function Field({ label, icon: Icon, value, onChange, type = 'text', required, error, className = '', placeholder = '', min, max }) {
-  const generatedId = useId()
-  const inputId = `booking-${generatedId}`
-
-  return (
-    <div className={className}>
-      <label htmlFor={inputId} className="field-label flex items-center gap-1.5">
-        {Icon && <Icon size={12} />}{label}{required && <span className="text-orange-500">*</span>}
-      </label>
-      <input 
-        id={inputId}
-        type={type} 
-        value={value} 
-        required={required} 
-        placeholder={placeholder}
-        min={min}
-        max={max}
-        onChange={(e) => onChange(e.target.value)} 
-        className={`field-input ${error ? 'border-red-300 focus:border-red-500' : ''}`}
-      />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-    </div>
-  )
+function EnquiryNote() {
+  return <div className="mt-6 rounded-2xl border border-orange-200 bg-orange-50 p-4"><p className="text-sm leading-relaxed text-charcoal-300">{ENQUIRY_COPY}</p><Link to="/contact" className="btn-outline mt-3 min-h-10 w-fit">Send Enquiry <ArrowRight size={15} /></Link></div>
 }
 
-function TextArea({ label, icon: Icon, value, onChange, error, className = '', placeholder = 'Anything we should know before your visit?' }) {
-  const generatedId = useId()
-  const inputId = `booking-${generatedId}`
-
-  return (
-    <div className={className}>
-      <label htmlFor={inputId} className="field-label flex items-center gap-1.5">
-        {Icon && <Icon size={12} />}{label}
-      </label>
-      <textarea
-        id={inputId}
-        value={value}
-        placeholder={placeholder}
-        rows={4}
-        onChange={(e) => onChange(e.target.value)}
-        className={`field-input min-h-[116px] resize-y ${error ? 'border-red-300 focus:border-red-500' : ''}`}
-      />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-    </div>
-  )
+function SuccessView({ booking, onReset }) {
+  return <section className="bg-[#fffdfa] py-12 sm:py-16"><SEO {...PAGE_SEO['/booking']} path="/booking" /><div className="container-x"><div className="mx-auto max-w-2xl rounded-3xl border border-green-200 bg-white p-6 text-center shadow-card sm:p-8"><div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-green-100 text-green-700"><CheckCircle2 size={28} /></div><h1 className="mt-5 font-display text-3xl font-extrabold">Booking Request Received</h1><p className="mt-3 text-sm leading-relaxed text-muted">Your request is pending review. RCC will contact you when the selected session is approved.</p>{booking.bookingId && <div className="mt-5 rounded-xl bg-bg-soft px-4 py-3 text-sm"><span className="text-muted">Booking ID</span><strong className="ml-2">{booking.bookingId}</strong></div>}<div className="mt-6 grid gap-3 sm:grid-cols-2"><Link to="/" className="btn-outline">Return Home</Link><button type="button" onClick={onReset} className="btn-primary">Book Another Session</button></div></div></div></section>
 }
 
-function SummaryRow({ icon: Icon, label, value, className = '' }) {
-  return (
-    <div className={`flex items-start gap-3 rounded-xl border border-border bg-white p-3 ${className}`}>
-      <div className="grid place-items-center w-9 h-9 rounded-md bg-orange-100 text-orange-600 flex-shrink-0">
-        <Icon size={16} />
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-widest text-muted font-bold">{label}</div>
-        <div className="text-sm font-semibold text-charcoal-300 break-words">{value || '-'}</div>
-      </div>
-    </div>
-  )
+function StepHeading({ icon: Icon, title, text }) {
+  return <div><div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-orange-600"><Icon size={15} />Step</div><h2 className="mt-2 font-display text-2xl font-extrabold text-charcoal-300 sm:text-3xl">{title}</h2><p className="mt-2 text-sm leading-relaxed text-muted">{text}</p></div>
 }
 
-function PremiumSummaryRow({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-bg-soft p-3">
-      <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full bg-green-100 text-green-700">
-        <CheckCircle2 size={17} />
-      </div>
-      <Icon size={16} className="hidden flex-shrink-0 text-orange-600 sm:block" />
-      <div className="min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-widest text-muted">{label}</div>
-        <div className="truncate text-sm font-extrabold text-charcoal-300">{value || '-'}</div>
-      </div>
-    </div>
-  )
+function InlineNotice({ children }) {
+  return <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">{children}</div>
 }
 
-function InfoListCard({ title, items, subtle = false }) {
-  return (
-    <div className={`rounded-2xl border p-4 ${subtle ? 'border-border bg-bg-soft' : 'border-orange-200 bg-orange-50'}`}>
-      <div className={`text-sm font-extrabold ${subtle ? 'text-charcoal-300' : 'text-orange-800'}`}>{title}</div>
-      <div className="mt-3 grid gap-2">
-        {items.map((item) => (
-          <div key={item} className="flex items-start gap-2 text-sm text-charcoal-300">
-            <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0 text-green-600" />
-            <span>{item}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+function ErrorText({ children }) {
+  return <p className="mt-2 text-xs font-semibold text-red-600">{children}</p>
 }
+
+function validateStep(step, data, slot) {
+  if (step === 0 && !data.date) return { date: 'Please select a booking date.' }
+  if (step === 1 && !slot) return { slot: 'Please select an available time slot.' }
+  if (step === 2 && (!data.remotes || data.remotes > Number(slot?.remaining || 0))) return { remotes: 'Please select an available number of remotes.' }
+  if (step === 3 && !DURATIONS.some((item) => item.minutes === data.durationMinutes)) return { duration: 'Please select 45 or 60 minutes.' }
+  if (step === 4) return { ...(!data.toastieSelection ? { toastie: 'Please select a toastie.' } : {}), ...(!data.drinkSelection ? { drink: 'Please select a hot coffee.' } : {}) }
+  if (step === 5) return validateDetails(data)
+  return {}
+}
+
+function validateAll(data, slot) {
+  return {
+    ...(!data.date ? { date: 'Please select a date.' } : {}),
+    ...(!slot ? { slot: 'Please select a time slot.' } : {}),
+    ...(!data.remotes || data.remotes > Number(slot?.remaining || 0) ? { remotes: 'Selected remotes exceed current availability.' } : {}),
+    ...(!DURATIONS.some((item) => item.minutes === data.durationMinutes) ? { duration: 'Please select gameplay duration.' } : {}),
+    ...(!data.toastieSelection ? { toastie: 'Please select a toastie.' } : {}),
+    ...(!data.drinkSelection ? { drink: 'Please select a hot coffee.' } : {}),
+    ...validateDetails(data)
+  }
+}
+
+function validateDetails(data) {
+  const errors = {}
+  if (data.customerName.trim().length < 2) errors.name = 'Please enter your full name.'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail.trim())) errors.email = 'Please enter a valid email address.'
+  if (data.customerPhone.replace(/\D/g, '').length < 6) errors.phone = 'Please enter your phone number.'
+  return errors
+}
+
+function firstInvalidStep(errors) {
+  if (errors.date) return 0
+  if (errors.slot) return 1
+  if (errors.remotes) return 2
+  if (errors.duration) return 3
+  if (errors.toastie || errors.drink) return 4
+  if (errors.name || errors.email || errors.phone) return 5
+  return 6
+}
+
+function slotsWithAvailability(usage, capacity) {
+  return FIXED_SLOTS.map((slot) => {
+    const used = Math.max(Number(usage[normalizeStart(slot.startTime)] || 0), 0)
+    return { ...slot, used, remaining: Math.max(capacity - used, 0) }
+  })
+}
+
+function appsAvailabilityToUsage(result, capacity) {
+  const rows = Array.isArray(result) ? result : result?.slots || []
+  return Object.fromEntries(rows.map((row) => {
+    const remaining = Number(row.remainingSpots ?? row.available ?? capacity)
+    return [normalizeStart(row.slot || row.slotTime || row.time), Math.max(capacity - remaining, 0)]
+  }))
+}
+
+function createAvailableDates(settings) {
+  const today = getAucklandToday()
+  const blocked = new Set([...(settings.holidayDates || []), ...(settings.blackoutDates || [])])
+  return Array.from({ length: 90 }, (_, index) => {
+    const date = new Date(today)
+    date.setDate(date.getDate() + index)
+    return date
+  }).filter((date) => !blocked.has(formatDateKey(date)))
+}
+
+function normalizeStart(value) {
+  const text = String(value || '').trim().toUpperCase().split(/\s+-\s+/)[0]
+  const match = text.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/)
+  return match ? `${match[1].padStart(2, '0')}:${match[2]} ${match[3]}` : text
+}
+
+function formatHour(hour24) {
+  const normalized = hour24 % 24
+  const period = normalized >= 12 ? 'PM' : 'AM'
+  const hour = normalized % 12 || 12
+  return `${String(hour).padStart(2, '0')}:00 ${period}`
+}
+
+function friendlySubmitError(error) {
+  const message = String(error?.message || '')
+  if (message.includes('CAPACITY_EXCEEDED') || message.toLowerCase().includes('capacity')) return 'The selected hour no longer has enough remotes. Please choose another time slot.'
+  return 'We could not submit your booking request right now. Please retry or send an enquiry.'
+}
+
+function startOfMonth(date) { const value = new Date(date); value.setDate(1); value.setHours(0, 0, 0, 0); return value }
+function addMonths(date, amount) { const value = new Date(date); value.setMonth(value.getMonth() + amount); return value }
+function sameDay(a, b) { return Boolean(a && b && a.toDateString() === b.toDateString()) }

@@ -1,419 +1,455 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  ArrowRight, Coffee, Cake, GraduationCap, Users, Gift, Truck,
-  ChevronDown, Heart, Sparkles, ShieldCheck, Phone, Building2
-} from 'lucide-react'
-import SectionHeading from '../components/SectionHeading.jsx'
-import MachineCard from '../components/MachineCard.jsx'
-import VideoRail from '../components/VideoRail.jsx'
-import { RewardCardBack, RewardCardFront } from '../components/rewards/RewardCardDisplay.jsx'
-import { MACHINES } from '../data/machines.js'
-import { PRICING, SITE } from '../data/site.js'
-import { GALLERY } from '../data/gallery.js'
+import { useEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
+import { ArrowRight, BadgeCheck, Calendar, Check, Coffee, Gift, Mail, PartyPopper, QrCode, Sparkles, Truck, Users } from 'lucide-react'
+import Logo from '../components/Logo.jsx'
+import SEO from '../components/SEO.jsx'
+import { SITE } from '../data/site.js'
+import { PAGE_SEO } from '../data/seo.js'
+import { trackBookNowClick } from '../hooks/useAnalytics.js'
+import { useCmsContent } from '../hooks/useCmsContent.js'
 
-const CHIPS = [
-  { icon: Heart, label: 'Family Friendly' },
-  { icon: Truck, label: 'RC Construction Arena' },
-  { icon: Coffee, label: 'Cafe Experience' },
-  { icon: Cake, label: 'Birthday Friendly' },
-  { icon: Sparkles, label: 'Easy Online Booking' }
+const HERO_SUBTITLE = "Remote Control Café is New Zealand's most unique café experience, combining great coffee, tasty food, and exciting remote-control fun for all ages."
+const HERO_BADGES = ['Real RC Machines', 'Café & Snacks', 'Family Friendly', 'Birthday Friendly']
+
+const HIGHLIGHTS = [
+  { icon: Truck, title: 'RC Construction Arena', text: 'Drive detailed remote-control construction machines in a purpose-built indoor arena.' },
+  { icon: Coffee, title: 'Cafe Food & Snacks', text: 'Pair your play session with toasties, hot coffee and cafe favourites.' },
+  { icon: Users, title: 'All Ages Welcome', text: 'A fun, easy experience for families, kids, friends and first-time visitors.' }
 ]
 
-const GROUPS = [
-  { icon: Cake, title: 'Birthday Parties', desc: 'Unforgettable RC-themed birthdays for kids and adults.' },
-  { icon: Building2, title: 'Corporate Bookings', desc: 'Team outings, corporate events and special functions.' },
-  { icon: GraduationCap, title: 'School Visits', desc: 'Hands-on learning with real construction machinery.' },
-  { icon: Users, title: 'Family Fun', desc: 'A perfect indoor outing for the whole family.' },
-  { icon: Gift, title: 'Group Bookings', desc: 'Food + RC play packages for families, friends and teams.' },
-  { icon: Truck, title: 'Special Functions', desc: 'Free venue hire available for special functions and events.' }
-]
-
-const FAQS = [
-  { q: 'Do I need to book in advance?', a: 'Yes. Weekday online slots can be booked through the website. Weekend sessions should be booked directly at the cafe or by contacting us.' },
-  { q: 'How long is each session?', a: 'Our RC + Food Garage packages include 30, 45 or 60 minutes of play. Upgraded Play options are available for 15 or 30 minutes.' },
-  { q: 'Which package is most popular?', a: 'POWER is the most popular package with 45 minutes of play, any toastie and any hot coffee.' },
-  { q: 'Are group bookings available?', a: 'Yes. Corporate events, birthday parties, school visits and group bookings are available with free venue hire options.' },
-  { q: 'What happens if a toy is damaged?', a: 'Please return all RC toys to staff after your session. Any damage caused by misuse may be charged at repair or replacement cost.' }
-]
-
-const REWARD_PREVIEW_CARD = {
-  cardId: 'RCC-1001',
-  token: 'home-preview',
-  name: 'RCC Guest',
-  phone: '09 558 7570',
-  stampCount: 3,
-  cycle: 1,
-  rewardStatus: 'collecting',
-  lastStampDate: '',
-  history: []
-}
-
-const REWARD_POINTS = [
-  { icon: Gift, label: 'Free digital card' },
-  { icon: Truck, label: '1 visit = 1 stamp' },
-  { icon: Sparkles, label: '7 stamps = surprise gift' },
-  { icon: ShieldCheck, label: 'No physical card required' }
-]
-
-const REWARD_STEPS = [
-  'Register once',
-  'Save your digital card link',
-  'Show card at RCC counter',
-  'Staff adds your stamp'
+const EVENTS = [
+  'Birthday Parties',
+  'Venue Hire',
+  'Corporate Events',
+  'School Holiday Groups',
+  'Private Functions',
+  'Large Group Bookings'
 ]
 
 export default function Home() {
+  const cms = useCmsContent('home')
   return (
     <>
-      <Hero />
-      <HighlightsBar />
-      <div id="videos">
-        <VideoRail />
-      </div>
-      <AboutExperience />
-      <RewardsSection />
-      <MachinesSection />
-      <PricingSection />
-      <CorporateSection />
-      <GalleryPreview />
-      <GroupsSection />
-      <FAQSection />
-      <FinalCTA />
+      <SEO {...PAGE_SEO['/']} path="/" />
+      <HeroSection cms={cms} />
+      <IntroSection cms={cms} />
+      <ExperienceHighlights />
+      <PackagesSection />
+      <RewardsSection cms={cms} />
+      <MomentsSection />
+      <EventsSection cms={cms} />
+      <HomeEnquiryForm cms={cms} />
     </>
   )
 }
 
-function RewardsSection() {
+function HeroSection({ cms }) {
+  const videoRef = useRef(null)
+  const heroTitle = cms.field('hero', 'title', 'Drive. Dig. Build. Play.')
+  const heroSubtitle = cms.field('hero', 'subtitle', HERO_SUBTITLE)
+  const heroVideo = cms.field('hero', 'videoUrl', '/videos/hero-rc-gameplay.mp4')
+  const heroPoster = cms.field('hero', 'imageUrl', '/images/hero-arena.jpg')
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !('IntersectionObserver' in window)) return undefined
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) video.play().catch(() => {})
+      else video.pause()
+    }, { threshold: 0.12 })
+
+    observer.observe(video)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <section id="rewards-preview" className="section-light py-8 sm:py-10">
-      <div className="container-x">
-        <div className="relative overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-br from-white via-[#fffaf3] to-white p-5 shadow-soft sm:p-6 lg:p-7">
-          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-orange-500 via-orange-300 to-charcoal-300" />
-          <div className="relative grid gap-7 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-            <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-              <span className="eyebrow"><Gift size={14} />RCC Rewards</span>
-              <h2 className="mt-3 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-[38px]">RCC Digital <span className="text-orange-500">Reward Card</span></h2>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-                Register once, collect stamps on every visit, and unlock a surprise gift after 7 visits.
-              </p>
+    <section className="relative min-h-[680px] overflow-hidden border-b border-charcoal-300 bg-charcoal-300 text-white sm:min-h-[calc(100svh-96px)]">
+      <video
+        ref={videoRef}
+        className="absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center"
+        src={heroVideo}
+        poster={heroPoster}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/88 via-black/62 to-black/28 sm:from-black/80 sm:via-black/58 sm:to-black/22" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 sm:from-black/20" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,108,24,0.28),transparent_34%),radial-gradient(circle_at_75%_70%,rgba(255,255,255,0.12),transparent_28%)]" />
+      <motion.div
+        aria-hidden="true"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1.1 }}
+        className="absolute bottom-8 right-6 hidden rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold uppercase tracking-widest text-white/85 backdrop-blur lg:block"
+      >
+        Auckland indoor RC arena
+      </motion.div>
 
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {REWARD_POINTS.map((point) => (
-                  <div key={point.label} className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-white px-3 py-2.5 shadow-sm">
-                    <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-600">
-                      <point.icon size={18} />
-                    </div>
-                    <div className="text-sm font-extrabold text-charcoal-300">{point.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {REWARD_STEPS.map((step, index) => (
-                  <div key={step} className="flex items-center gap-2 text-sm font-semibold text-charcoal-100">
-                    <span className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-charcoal-300 text-[10px] font-extrabold text-white">{index + 1}</span>
-                    {step}
-                  </div>
-                ))}
-              </div>
-
-              <p className="mt-4 rounded-2xl border border-orange-100 bg-white px-4 py-3 text-sm font-semibold text-charcoal-300">
-                Customers can open their card anytime from the saved link or WhatsApp message.
-              </p>
-
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <Link to="/rewards" className="btn-primary">Create My Card <ArrowRight size={16} /></Link>
-                <Link to="/rewards/card/demo" className="btn-outline">View Demo</Link>
-              </div>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.08 }} className="min-w-0">
-              <div className="mx-auto grid w-full max-w-md gap-4 sm:gap-5">
-                <RewardCardFront card={REWARD_PREVIEW_CARD} compact />
-                <RewardCardBack card={REWARD_PREVIEW_CARD} compact />
-              </div>
-              <div className="mx-auto mt-3 max-w-md rounded-2xl border border-orange-100 bg-white px-4 py-2.5 text-center text-sm font-semibold text-charcoal-300">
-                Demo progress: 3 of 7 stamps collected
-              </div>
-            </motion.div>
-          </div>
+      <div className="container-x relative z-10 flex min-h-[680px] items-center py-10 sm:min-h-[calc(100svh-96px)] sm:py-16 lg:py-20">
+        <div className="max-w-4xl">
+          <motion.span
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55 }}
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[11px] font-extrabold uppercase tracking-widest text-orange-100 backdrop-blur"
+          >
+            <Sparkles size={14} /> Remote Control Cafe
+          </motion.span>
+          <motion.h1
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.08 }}
+            className="mt-4 max-w-[760px] font-display text-[42px] font-extrabold leading-[0.98] text-white min-[400px]:text-5xl sm:mt-5 sm:text-6xl lg:text-7xl"
+          >
+            {heroTitle}
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, delay: 0.16 }}
+            className="mt-4 max-w-2xl text-[15px] leading-relaxed text-white/90 sm:mt-5 sm:text-lg"
+          >
+            {heroSubtitle}
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, delay: 0.24 }}
+            className="mt-6 grid grid-cols-1 gap-3 sm:mt-7 sm:flex sm:flex-row"
+          >
+            <Link to="/booking#calendar" className="btn-primary min-h-12 px-5 sm:min-h-[54px] sm:px-6" onClick={() => trackBookNowClick({ location: 'home_hero' })}>
+              Book Your Session <ArrowRight size={16} />
+            </Link>
+            <Link to="/rewards" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/30 bg-black/20 px-5 py-3 text-sm font-extrabold text-white backdrop-blur transition hover:bg-white hover:text-charcoal-300 sm:min-h-[54px] sm:px-6">
+              Create Reward Card
+            </Link>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, delay: 0.32 }}
+            className="mt-5 flex flex-wrap gap-2 sm:mt-7 sm:gap-2.5"
+          >
+            {HERO_BADGES.map((badge) => (
+              <span key={badge} className="rounded-full border border-white/20 bg-black/20 px-2.5 py-1 text-[10px] font-bold text-white/90 backdrop-blur sm:px-3 sm:py-1.5 sm:text-xs">
+                {badge}
+              </span>
+            ))}
+          </motion.div>
         </div>
       </div>
     </section>
   )
 }
 
-function CompactSectionHeading({ eyebrow, title, subtitle }) {
+function Reveal({ children, className = '', delay = 0 }) {
   return (
-    <div className="mx-auto max-w-2xl text-center">
-      {eyebrow && <span className="eyebrow"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" />{eyebrow}</span>}
-      <h2 className="mt-3 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-4xl">{title}</h2>
-      {subtitle && <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">{subtitle}</p>}
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: 0.55, delay }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+function IntroSection({ cms }) {
+  const title = cms.field('intro', 'title', 'A cafe visit with something exciting to do.')
+  const body = cms.field('intro', 'body', 'Remote Control Cafe is made for people who want more than a standard cafe stop. Enjoy a relaxed cafe setting, choose a food and play package, and experience remote-control construction machines in a clean indoor space.')
+  return (
+    <section className="section-light relative overflow-hidden py-12 sm:py-16">
+      <div className="absolute -right-24 -top-24 h-56 w-56 rounded-full bg-orange-100/70 blur-3xl" />
+      <Reveal className="container-x grid gap-6 lg:grid-cols-12 lg:items-center">
+        <div className="lg:col-span-5">
+          <span className="eyebrow"><BadgeCheck size={14} />Why Remote Control Cafe</span>
+          <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300 sm:text-4xl">
+            {title}
+          </h2>
+        </div>
+        <div className="lg:col-span-7">
+          <p className="text-base leading-relaxed text-muted">
+            {body}
+          </p>
+        </div>
+      </Reveal>
+    </section>
+  )
+}
+
+function ExperienceHighlights() {
+  return (
+    <section className="section-soft py-12 sm:py-16">
+      <div className="container-x">
+        <Reveal className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <span className="eyebrow"><Truck size={14} />Experience Highlights</span>
+            <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300">What guests enjoy at RCC</h2>
+          </div>
+          <Link to="/experience" className="btn-outline w-fit">View Experience <ArrowRight size={16} /></Link>
+        </Reveal>
+        <div className="mt-7 grid gap-4 md:grid-cols-3">
+          {HIGHLIGHTS.map(({ icon: Icon, title, text }, index) => (
+            <Reveal key={title} delay={index * 0.06}>
+              <article className="card card-hover h-full p-5">
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-orange-100 text-orange-600">
+                  <Icon size={20} />
+                </div>
+                <h3 className="mt-4 font-display text-lg font-extrabold text-charcoal-300">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{text}</p>
+              </article>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function PackagesSection() {
+  return (
+    <section className="section-light py-12 sm:py-16">
+      <div className="container-x">
+        <Reveal className="overflow-hidden rounded-3xl border border-orange-200 bg-white p-6 shadow-card sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <span className="eyebrow"><Calendar size={14} />Book Online</span>
+              <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300">Ready to Book Your Remote Control Session?</h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted">Choose your date, time slot, remotes and gameplay duration in a simple booking flow.</p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row lg:shrink-0">
+              <Link to="/booking#calendar" className="btn-primary" onClick={() => trackBookNowClick({ location: 'home_booking_cta' })}>Book Your Session <ArrowRight size={16} /></Link>
+              <Link to="/contact" className="btn-outline">Group / Venue Enquiry</Link>
+            </div>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  )
+}
+
+function RewardsSection({ cms }) {
+  const title = cms.field('rewards', 'title', 'Create Your Free Reward Card')
+  const body = cms.field('rewards', 'body', 'Sign up for your digital reward card and unlock a welcome surprise after creating your card.')
+  return (
+    <section className="section-soft relative overflow-hidden py-12 sm:py-16">
+      <div className="absolute -left-28 bottom-0 h-64 w-64 rounded-full bg-orange-100/70 blur-3xl" />
+      <div className="container-x grid gap-7 lg:grid-cols-12 lg:items-center">
+        <Reveal className="lg:col-span-6">
+          <span className="eyebrow"><Gift size={14} />RCC Reward Card</span>
+          <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300 sm:text-4xl">{title}</h2>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">
+            {body}
+          </p>
+          <div className="mt-5 grid gap-2 text-sm text-charcoal-300 sm:grid-cols-2">
+            {['Free digital card', 'Save your card link', 'Staff scans your QR', 'Collect stamps anytime'].map((item) => (
+              <div key={item} className="flex items-center gap-2"><BadgeCheck size={16} className="text-green-600" /> {item}</div>
+            ))}
+          </div>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <Link to="/rewards" className="btn-primary">Create My Reward Card <ArrowRight size={16} /></Link>
+            <Link to="/rewards" className="btn-outline">See How It Works</Link>
+          </div>
+        </Reveal>
+        <Reveal className="lg:col-span-6" delay={0.08}>
+          <RewardPreviewCard />
+        </Reveal>
+      </div>
+    </section>
+  )
+}
+
+function RewardPreviewCard() {
+  return (
+    <div className="relative mx-auto max-w-md overflow-hidden rounded-[28px] border border-orange-200 bg-white p-5 shadow-card transition duration-300 hover:-translate-y-1 hover:shadow-glow">
+      <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-orange-500 via-charcoal-300 to-orange-400" />
+      <div className="flex items-start justify-between gap-4">
+        <Logo className="h-14 w-auto max-w-[150px]" />
+        <span className="rounded-full bg-orange-500 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-white">Active Card</span>
+      </div>
+      <div className="mt-5 grid grid-cols-[1fr_auto] items-end gap-4">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-muted">Digital Reward Card</div>
+          <h3 className="mt-1 font-display text-2xl font-extrabold text-charcoal-300">RCC Guest</h3>
+          <p className="mt-1 text-sm font-semibold text-orange-700">Card ID: RCC1001</p>
+        </div>
+        <div className="grid h-16 w-16 place-items-center rounded-2xl border border-orange-200 bg-[#fff8ee] text-center">
+          <QrCode size={24} className="text-charcoal-300" />
+          <span className="-mt-3 text-[8px] font-extrabold uppercase tracking-wider text-orange-700">Scan</span>
+        </div>
+      </div>
+      <div className="mt-5 flex gap-1.5">
+        {Array.from({ length: 7 }).map((_, index) => (
+          <span key={index} className={`grid h-8 w-8 place-items-center rounded-full border text-[10px] font-extrabold ${index < 3 ? 'border-orange-500 bg-orange-500 text-white' : index === 6 ? 'border-orange-300 bg-orange-50 text-orange-700' : 'border-orange-100 bg-white text-muted'}`}>
+            {index === 6 ? 'G' : index < 3 ? <Check size={13} strokeWidth={3} /> : index + 1}
+          </span>
+        ))}
+      </div>
+      <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-[#fff8ee] p-4 text-sm font-semibold text-charcoal-300">
+        <span>Create your card to reveal your welcome surprise.</span>
+        <span className="shrink-0 font-extrabold text-orange-700">3/7</span>
+      </div>
     </div>
   )
 }
 
-function Hero() {
-  const scrollToSection = (id) => {
-    const element = document.getElementById(id)
-    if (element) element.scrollIntoView({ behavior: 'smooth' })
+const MOMENT_IMAGES = [
+  { src: '/images/hero-arena.jpg', alt: 'Remote Control Cafe indoor arena' },
+  { src: '/images/rc-excavator-arena.jpg', alt: 'RC excavator in the arena' },
+  { src: '/images/family-cafe-activity.jpg', alt: 'Family cafe activity at RCC' },
+  { src: '/images/indoor-arena.jpg', alt: 'Indoor construction play arena' },
+  { src: '/images/birthday-party.jpg', alt: 'Birthday celebration at RCC' },
+  { src: '/images/kids-rc-construction.jpg', alt: 'Kids enjoying RC construction play' },
+  { src: '/images/rc-crane.jpg', alt: 'Remote control crane' },
+  { src: '/images/rc-fire-truck.jpg', alt: 'Remote control fire truck' }
+]
+
+function MomentsSection() {
+  const firstRow = [...MOMENT_IMAGES, ...MOMENT_IMAGES]
+  const secondRow = [...MOMENT_IMAGES.slice().reverse(), ...MOMENT_IMAGES.slice().reverse()]
+
+  return (
+    <section className="section-light overflow-hidden py-10 sm:py-14">
+      <div className="container-x">
+        <Reveal className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <span className="eyebrow"><Sparkles size={14} />Inside RCC</span>
+            <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300 sm:text-4xl">Moments at Remote Control Cafe</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">RC action, cafe favourites and memorable visits, all under one roof.</p>
+          </div>
+          <div className="flex gap-3">
+            <Link to="/gallery" className="btn-outline">View Gallery</Link>
+            <Link to="/menu" className="btn-primary">View Menu <ArrowRight size={16} /></Link>
+          </div>
+        </Reveal>
+      </div>
+      <div className="mt-7 space-y-4">
+        <MomentTrack items={firstRow} />
+        <div className="hidden sm:block">
+          <MomentTrack items={secondRow} reverse />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function MomentTrack({ items, reverse = false }) {
+  return (
+    <div className="moment-marquee overflow-hidden">
+      <div className={`moment-track flex w-max gap-4 px-2 ${reverse ? 'moment-track-reverse' : ''}`}>
+        {items.map((item, index) => (
+          <figure key={`${item.src}-${index}`} className="relative h-36 w-56 shrink-0 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-soft sm:h-40 sm:w-64">
+            <img src={item.src} alt={index < MOMENT_IMAGES.length ? item.alt : ''} className="h-full w-full object-cover transition duration-500 hover:scale-105" loading="lazy" decoding="async" />
+            <div className="absolute inset-x-0 bottom-0 h-1 bg-orange-500" />
+          </figure>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EventsSection({ cms }) {
+  const title = cms.field('venue_hire', 'title', 'Special bookings are handled by enquiry.')
+  const body = cms.field('venue_hire', 'body', 'For weekend sessions, venue hire, school holidays, public holidays and private events, send a message and our team will respond within 24 hours.')
+  const footnote = cms.field('venue_hire', 'footnote', 'Venue hire starts from $300. Please send an enquiry for details and availability.')
+  return (
+    <section className="section-light py-12 sm:py-16">
+      <div className="container-x">
+        <Reveal className="rounded-3xl border border-orange-200 bg-white p-6 shadow-soft sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-12 lg:items-center">
+            <div className="lg:col-span-5">
+              <span className="eyebrow"><PartyPopper size={14} />Venue Hire / Events</span>
+              <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300">{title}</h2>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                {body}
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:col-span-7">
+              {EVENTS.map((event) => (
+                <div key={event} className="rounded-2xl border border-border bg-bg-soft px-4 py-3 text-sm font-bold text-charcoal-300">
+                  {event}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-6 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-semibold text-charcoal-300">{footnote}</p>
+            <Link to="/contact" className="btn-primary w-fit">Send Enquiry <ArrowRight size={16} /></Link>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  )
+}
+
+function HomeEnquiryForm({ cms }) {
+  const title = cms.field('enquiry', 'title', 'Need help planning a visit?')
+  const intro = cms.field('enquiry', 'body', 'For special bookings, events, venue hire or weekend/school holiday enquiries, send us a message. Our team will respond within 24 hours.')
+  const [sent, setSent] = useState(false)
+  const [form, setForm] = useState({ name: '', email: '', type: 'General Enquiry', message: '' })
+
+  const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
+
+  const submit = (event) => {
+    event.preventDefault()
+    const subject = encodeURIComponent(`Remote Control Cafe enquiry - ${form.type}`)
+    const body = encodeURIComponent(`Name: ${form.name}\nEmail: ${form.email}\nEnquiry Type: ${form.type}\n\n${form.message}`)
+    window.location.href = `mailto:${SITE.email}?subject=${subject}&body=${body}`
+    setSent(true)
   }
 
   return (
-    <section className="relative min-h-[76vh] md:min-h-[78vh] md:max-h-[820px] flex items-center overflow-hidden bg-charcoal-300">
-      <video className="absolute inset-0 w-full h-full object-cover object-center md:object-center-[55%]" autoPlay muted loop playsInline preload="metadata">
-        <source src="/videos/hero-rc-gameplay.mp4" type="video/mp4" />
-      </video>
-      <div className="absolute inset-0 z-10" style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.48) 42%, rgba(0,0,0,0.18) 100%), linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.55) 100%)' }} />
-      <div className="relative z-20 px-4 sm:px-6 md:px-8 py-[96px] md:py-0">
-        <div className="max-w-[720px] md:ml-[8vw] text-white">
-          <motion.span initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-orange-500/50 bg-black/40 backdrop-blur-md text-xs sm:text-sm font-bold uppercase tracking-widest text-orange-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-            Auckland - Family Friendly - Open Daily
-          </motion.span>
-          <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="font-display mt-4 sm:mt-5 text-[clamp(42px,13vw,64px)] leading-[0.95] font-extrabold tracking-tight text-white" style={{ textShadow: '0 8px 30px rgba(0,0,0,0.55)' }}>
-            Drive. Dig. <span className="text-orange-500">Build.</span> Play.
-          </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-4 sm:mt-5 text-base sm:text-[18px] leading-relaxed max-w-[620px] text-white/92">
-            New Zealand's first family-friendly RC construction arena where kids, families and groups operate real RC construction machines.
-          </motion.p>
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-6 sm:mt-7 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Link to="/booking#calendar" className="inline-flex h-[52px] items-center justify-center rounded-full bg-orange-500 px-6 text-base font-bold text-white shadow-lg shadow-orange-500/30 transition-shadow hover:shadow-orange-500/50">Book Your Session</Link>
-            <button onClick={() => scrollToSection('videos')} className="h-[52px] rounded-full bg-black/40 backdrop-blur-md border border-white/35 text-white font-semibold text-base px-6 hover:bg-black/50 transition-colors">Watch The Experience</button>
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className="mt-6 sm:mt-8 flex flex-wrap gap-2 sm:gap-3">
-            {[
-              { icon: Truck, label: 'Real RC Machines' },
-              { icon: Coffee, label: 'Cafe & Snacks' },
-              { icon: Cake, label: 'Birthday Friendly' },
-              { icon: Users, label: 'Family Friendly' }
-            ].map((item) => (
-              <div key={item.label} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/18 text-sm text-white">
-                <item.icon size={14} className="text-orange-400" />
-                <span className="text-xs sm:text-sm">{item.label}</span>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function HighlightsBar() {
-  return (
-    <section className="bg-bg-soft border-y border-border">
-      <div className="container-x py-6 flex flex-wrap items-center justify-center gap-2.5">
-        {CHIPS.map((c, i) => (
-          <motion.span key={c.label} initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05 }} className="chip">
-            <c.icon size={14} className="text-orange-500" />
-            {c.label}
-          </motion.span>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function AboutExperience() {
-  return (
-    <section className="section-light py-14 sm:py-20">
-      <div className="container-x grid lg:grid-cols-2 gap-12 items-center">
-        <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
-          <span className="eyebrow"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" />The Experience</span>
-          <h2 className="heading-display mt-4">A Real Construction <span className="accent">Play Experience</span></h2>
-          <p className="mt-5 text-muted leading-relaxed">
-            RC Cafe brings the excitement of construction machines into a safe, fun and interactive arena. Guests can control RC machines while enjoying a cafe environment designed for families, kids and groups.
+    <section className="section-soft py-12 sm:py-16">
+      <div className="container-x grid gap-7 lg:grid-cols-12">
+        <Reveal className="lg:col-span-5">
+          <span className="eyebrow"><Mail size={14} />Send Enquiry</span>
+          <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300">{title}</h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            {intro}
           </p>
-          <ul className="mt-6 space-y-3">
-            {[
-              { icon: ShieldCheck, t: 'Safe & supervised', d: 'Trained staff guide every session.' },
-              { icon: Truck, t: 'Real RC machines', d: 'Excavators, trucks, cranes, loaders & more.' },
-              { icon: Coffee, t: 'Cafe on-site', d: 'Coffee, smoothies, shakes and fresh snacks.' }
-            ].map((b) => (
-              <li key={b.t} className="flex gap-3">
-                <div className="flex-shrink-0 grid place-items-center w-10 h-10 rounded-xl bg-orange-100 text-orange-600"><b.icon size={18} /></div>
-                <div><div className="font-bold text-charcoal-300">{b.t}</div><div className="text-sm text-muted">{b.d}</div></div>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-7 flex gap-3">
-            <Link to="/booking#calendar" className="btn-primary">Book Now <ArrowRight size={16} /></Link>
-            <Link to="/about" className="btn-outline">About RC Cafe</Link>
-          </div>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="grid grid-cols-2 gap-4">
-          <div className="rounded-2xl overflow-hidden border border-border bg-bg-soft"><img src="/images/kids-rc-construction.jpg" alt="Kid operating an RC excavator" className="w-full h-72 object-cover" /></div>
-          <div className="rounded-2xl overflow-hidden border border-border bg-bg-soft mt-8"><img src="/images/family-cafe-activity.jpg" alt="Family cafe activity" className="w-full h-72 object-cover" /></div>
-          <div className="rounded-2xl overflow-hidden border border-border bg-bg-soft col-span-2"><img src="/images/indoor-arena.jpg" alt="Indoor RC construction arena" className="w-full h-48 object-cover" /></div>
-        </motion.div>
-      </div>
-    </section>
-  )
-}
-
-function MachinesSection() {
-  return (
-    <section className="section-soft py-10 sm:py-14">
-      <div className="container-x">
-        <CompactSectionHeading eyebrow="The Fleet" title={<>RC Machines & <span className="text-orange-500">Games</span></>} subtitle="Hands-on construction machines ready for supervised arena play." />
-        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {MACHINES.map((m, i) => <MachineCard m={m} key={m.id} index={i} compact />)}
-        </div>
-        <div className="mt-7 text-center"><Link to="/machines" className="btn-outline">View RC Machines <ArrowRight size={16} /></Link></div>
-      </div>
-    </section>
-  )
-}
-
-function PricingSection() {
-  return (
-    <section className="section-light py-10 sm:py-14">
-      <div className="container-x">
-        <CompactSectionHeading eyebrow="RC + Food Garage" title={<>Package <span className="text-orange-500">Pricing</span></>} subtitle="Pick a compact play package with cafe inclusions." />
-        <div className="mt-7 grid gap-4 md:grid-cols-3">
-          {PRICING.map((p, i) => {
-            const featured = p.id === 'power'
-            return (
-              <motion.div key={p.id} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }} className={`relative rounded-2xl border p-5 transition sm:p-6 ${featured ? 'border-orange-500 bg-orange-50 shadow-glow' : 'border-border bg-white shadow-soft hover:shadow-card'}`}>
-                {featured && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-orange-500 text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest">Most Popular</div>}
-                <div className="text-xs uppercase tracking-widest font-bold text-orange-600">{p.label}</div>
-                <div className="mt-2 flex items-end gap-1">
-                  <span className="font-display text-4xl font-extrabold text-charcoal-300">${p.price}</span>
-                  <span className="mb-1.5 text-sm text-muted">{p.unit}</span>
-                </div>
-                <ul className="mt-4 space-y-1.5 text-sm text-charcoal-100">
-                  {p.perks.slice(0, 2).map((x) => <li key={x} className="flex items-start gap-2"><span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-orange-500" /> {x}</li>)}
-                </ul>
-                <Link to={`/booking?package=${encodeURIComponent(p.label)}#calendar`} className={`mt-5 inline-flex w-full items-center justify-center rounded-full py-3 text-sm font-bold transition ${featured ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-charcoal-300 text-white hover:bg-charcoal-100'}`}>
-                  Book Now <ArrowRight size={14} className="ml-2" />
-                </Link>
-              </motion.div>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function CorporateSection() {
-  return (
-    <section className="section-soft py-10 sm:py-14">
-      <div className="container-x grid gap-8 lg:grid-cols-2 lg:items-center">
-        <div>
-          <span className="eyebrow"><Building2 size={14} />Corporate Bookings</span>
-          <h2 className="mt-4 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-4xl">Events, Parties & <span className="text-orange-500">Free Venue Hire</span></h2>
-          <p className="mt-4 text-muted leading-relaxed">
-            Plan corporate events, birthday parties, school visits, group bookings and special functions with RC play and food packages.
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/booking#events" className="btn-primary">Plan an Event <ArrowRight size={16} /></Link>
-            <a href={`tel:${SITE.phoneTel}`} className="btn-outline"><Phone size={16} /> {SITE.phone}</a>
-          </div>
-        </div>
-        <div className="rounded-2xl overflow-hidden border border-border bg-white shadow-soft">
-          <img src="/images/birthday-party.jpg" alt="RC Cafe event booking" className="h-64 w-full object-cover sm:h-72" />
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function GalleryPreview() {
-  const items = GALLERY.slice(0, 6)
-  return (
-    <section className="section-light py-10 sm:py-14">
-      <div className="container-x">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-          <SectionHeading align="left" eyebrow="Inside The Arena" title={<>A Glimpse Into <span className="accent">RC Cafe</span></>} subtitle="Real moments from our arena, machines and cafe." />
-          <Link to="/gallery" className="btn-outline self-start md:self-auto">View Gallery <ArrowRight size={16} /></Link>
-        </div>
-        <div className="mt-7 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 [grid-auto-rows:130px] sm:[grid-auto-rows:170px]">
-          {items.map((g, i) => (
-            <motion.div key={g.id} initial={{ opacity: 0, scale: 0.97 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ delay: i * 0.05 }} className={`relative overflow-hidden rounded-2xl border border-border bg-white shadow-soft group ${i === 0 ? 'col-span-2 row-span-2' : i === 3 ? 'row-span-2' : ''}`}>
-              <img src={g.src} alt={g.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-charcoal-300/80 to-transparent p-3 opacity-0 group-hover:opacity-100 transition"><div className="text-white text-[10px] uppercase tracking-widest font-bold">{g.category}</div></div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function GroupsSection() {
-  return (
-    <section className="section-light py-10 sm:py-14">
-      <div className="container-x">
-        <CompactSectionHeading eyebrow="Groups & Parties" title={<>Groups, Kids & <span className="text-orange-500">Celebrations</span></>} subtitle="Birthdays, school visits and group experiences in Auckland." />
-        <div className="mt-7 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {GROUPS.map((g, i) => (
-            <motion.div key={g.title} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05 }} whileHover={{ y: -4 }} className="card card-hover p-6">
-              <div className="grid place-items-center w-10 h-10 rounded-xl bg-orange-100 text-orange-600"><g.icon size={18} /></div>
-              <div className="font-display text-lg font-extrabold mt-3 text-charcoal-300">{g.title}</div>
-              <p className="mt-1.5 text-sm text-muted">{g.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function FAQSection() {
-  const [open, setOpen] = useState(0)
-  return (
-    <section className="section-soft py-10 sm:py-14">
-      <div className="container-x grid lg:grid-cols-12 gap-10">
-        <div className="lg:col-span-5">
-          <SectionHeading align="left" eyebrow="FAQ" title={<>Got <span className="accent">Questions?</span></>} subtitle="Everything you need to know before you book and play at RC Cafe Auckland." />
-          <Link to="/contact" className="btn-outline mt-6">Ask Us Anything</Link>
-        </div>
-        <div className="lg:col-span-7 space-y-3">
-          {FAQS.map((f, i) => {
-            const isOpen = open === i
-            return (
-              <div key={f.q} className={`rounded-2xl border transition ${isOpen ? 'border-orange-300 bg-orange-50' : 'border-border bg-white'}`}>
-                <button onClick={() => setOpen(isOpen ? -1 : i)} className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left">
-                  <span className="font-bold text-charcoal-300">{f.q}</span>
-                  <ChevronDown size={18} className={`flex-shrink-0 text-orange-600 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <motion.div initial={false} animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
-                  <div className="px-5 pb-5 text-sm text-muted">{f.a}</div>
-                </motion.div>
+        </Reveal>
+        <Reveal className="lg:col-span-7" delay={0.06}>
+          <form onSubmit={submit} className="card border-orange-100 p-5 shadow-card sm:p-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Full Name" value={form.name} onChange={update('name')} required />
+              <Field label="Email" type="email" value={form.email} onChange={update('email')} required />
+              <div className="sm:col-span-2">
+                <label className="field-label">Enquiry Type</label>
+                <select value={form.type} onChange={update('type')} className="field-input">
+                  <option>General Enquiry</option>
+                  <option>Party Booking</option>
+                  <option>Venue Hire</option>
+                  <option>Corporate / Event Booking</option>
+                  <option>School Holiday / Public Holiday Booking</option>
+                </select>
               </div>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function FinalCTA() {
-  return (
-    <section id="booking" className="relative section-light py-10 sm:py-14 overflow-hidden">
-      <div className="container-x">
-        <div className="relative rounded-3xl border border-border bg-bg-soft p-6 sm:p-8 lg:p-10 overflow-hidden">
-          <div className="relative grid lg:grid-cols-2 gap-8 items-center">
-            <div>
-              <span className="eyebrow"><span className="h-1.5 w-1.5 rounded-full bg-orange-500" />Ready When You Are</span>
-              <h2 className="mt-4 font-display text-3xl font-extrabold leading-tight text-charcoal-300 sm:text-4xl">Ready to Build Your Own Mini <span className="text-orange-500">Construction Site?</span></h2>
-              <p className="mt-4 text-muted max-w-lg">Book your RC Cafe package and enjoy Auckland's unique family-friendly construction arena and cafe.</p>
-              <div className="mt-7 flex flex-wrap gap-3">
-                <Link to="/booking#calendar" className="btn-primary">Book Now <ArrowRight size={16} /></Link>
-                <a href={`tel:${SITE.phoneTel}`} className="btn-outline"><Phone size={16} /> {SITE.phone}</a>
+              <div className="sm:col-span-2">
+                <label className="field-label">Message</label>
+                <textarea value={form.message} onChange={update('message')} required rows={5} className="field-input resize-y" placeholder="Tell us what you are planning..." />
               </div>
             </div>
-            <div className="rounded-2xl overflow-hidden border border-border bg-white shadow-soft">
-              <img src="/images/rc-excavator-arena.jpg" alt="RC excavator arena" className="w-full h-60 object-cover sm:h-64" />
-            </div>
-          </div>
-        </div>
+            {sent && <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">Your email app has opened with the enquiry details.</div>}
+            <button type="submit" className="btn-primary mt-5 w-full sm:w-auto">Send Enquiry <ArrowRight size={16} /></button>
+          </form>
+        </Reveal>
       </div>
     </section>
+  )
+}
+
+function Field({ label, value, onChange, type = 'text', required }) {
+  return (
+    <div>
+      <label className="field-label">{label}{required && <span className="text-orange-500">*</span>}</label>
+      <input type={type} value={value} onChange={onChange} required={required} className="field-input" />
+    </div>
   )
 }

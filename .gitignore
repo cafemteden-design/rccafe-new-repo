@@ -20,6 +20,7 @@ dist-ssr
 # Supabase secrets / service role keys
 **/service-role*.json
 **/*service_role*
+PRIVATE_SUPABASE_KEYS_DO_NOT_COMMIT.txt
 supabase/.temp
 
 # Logs

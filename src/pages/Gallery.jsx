@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import PageHero from '../components/PageHero.jsx'
+import SEO from '../components/SEO.jsx'
 import { GALLERY, GALLERY_FILTERS } from '../data/gallery.js'
+import { PAGE_SEO } from '../data/seo.js'
 
 export default function Gallery() {
   const [filter, setFilter] = useState('All')
@@ -11,6 +13,7 @@ export default function Gallery() {
 
   return (
     <>
+      <SEO {...PAGE_SEO['/gallery']} path="/gallery" />
       <PageHero
         breadcrumbs={['Gallery']}
         eyebrow="Inside The Arena"
@@ -19,7 +22,7 @@ export default function Gallery() {
         image="/images/indoor-arena.jpg"
       />
 
-      <section className="section-light py-12">
+      <section className="section-light py-12 sm:py-16">
         <div className="container-x">
           <div className="flex flex-wrap items-center gap-2 mb-8 justify-center">
             {GALLERY_FILTERS.map((f) => (

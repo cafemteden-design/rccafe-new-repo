@@ -1,33 +1,39 @@
 export const BOOKING_API_URL = "https://script.google.com/macros/s/AKfycbz2YjonaQjCAQrE_dNoa2h-7tozAI6cGGnaGxUnrJvN_fX0O66JCNBmMwp6UYcfRar32w/exec"
 
 export const BOOKING_CONFIG = {
-  operatingDays: [1, 2, 3, 4, 5],
+  operatingDays: [0, 1, 2, 3, 4, 5, 6],
   operatingHours: {
     start: { hour: 9, minute: 0 },
-    end: { hour: 16, minute: 0 }
+    end: { hour: 17, minute: 0 }
   },
-  maxCapacity: 5,
-  defaultSlotDuration: 45
+  maxCapacity: 8,
+  maximumGroupSize: 8,
+  slotCount: 8,
+  slotDuration: 60,
+  defaultSlotDuration: 60
 }
 
 export function isBookingApiConfigured() {
   return Boolean(BOOKING_API_URL)
 }
 
-export function generateSlotsForDate(date, availability = {}, durationMinutes = BOOKING_CONFIG.defaultSlotDuration) {
-  const { operatingDays } = BOOKING_CONFIG
-  const availabilityBySlot = normalizeAvailability(availability)
+export function generateSlotsForDate(date, availability = {}, durationMinutes = BOOKING_CONFIG.defaultSlotDuration, runtimeConfig = BOOKING_CONFIG) {
+  const config = { ...BOOKING_CONFIG, ...runtimeConfig }
+  const { operatingDays } = config
+  const availabilityBySlot = normalizeAvailability(availability, config.maxCapacity)
   const slotDuration = Number(durationMinutes) || BOOKING_CONFIG.defaultSlotDuration
 
   if (!date || !operatingDays.includes(date.getDay()) || slotDuration <= 0) {
     return []
   }
 
-  const startMinutes = BOOKING_CONFIG.operatingHours.start.hour * 60 + BOOKING_CONFIG.operatingHours.start.minute
-  const endMinutes = BOOKING_CONFIG.operatingHours.end.hour * 60 + BOOKING_CONFIG.operatingHours.end.minute
+  const startMinutes = config.operatingHours.start.hour * 60 + config.operatingHours.start.minute
+  const endMinutes = config.operatingHours.end.hour * 60 + config.operatingHours.end.minute
   const slotStartTimes = []
 
-  for (let minutes = startMinutes; minutes + slotDuration <= endMinutes; minutes += slotDuration) {
+  const slotInterval = Number(config.slotDuration || config.defaultSlotDuration || slotDuration)
+  const slotCount = Number(config.slotCount || 8)
+  for (let minutes = startMinutes; slotStartTimes.length < slotCount && minutes + slotDuration <= endMinutes; minutes += slotInterval) {
     slotStartTimes.push(minutes)
   }
 
@@ -35,7 +41,7 @@ export function generateSlotsForDate(date, availability = {}, durationMinutes = 
     const startTime = formatTime(minutes)
     const endTime = formatTime(minutes + slotDuration)
     const slotAvailability = availabilityBySlot[startTime] || availabilityBySlot[`${startTime} - ${endTime}`]
-    const available = Math.max(Number(slotAvailability?.available ?? BOOKING_CONFIG.maxCapacity), 0)
+    const available = clampAvailability(slotAvailability?.available ?? config.maxCapacity, config.maxCapacity)
 
     return {
       index,
@@ -44,7 +50,7 @@ export function generateSlotsForDate(date, availability = {}, durationMinutes = 
       endTime,
       durationMinutes: slotDuration,
       available,
-      maxCapacity: BOOKING_CONFIG.maxCapacity,
+      maxCapacity: config.maxCapacity,
       status: slotAvailability?.status || getSlotStatus(available)
     }
   })
@@ -54,6 +60,7 @@ export async function fetchSlotAvailability(date) {
   if (!isBookingApiConfigured()) return {}
 
   const url = new URL(BOOKING_API_URL)
+  url.searchParams.set('action', 'availability')
   url.searchParams.set('date', formatDateKey(date))
   url.searchParams.set('bookingDate', formatDateKey(date))
 
@@ -73,6 +80,10 @@ export async function fetchSlotAvailability(date) {
 
   if (!response.ok) {
     throw new Error('Unable to load slot availability.')
+  }
+
+  if (result?.success === false) {
+    throw new Error(result.message || 'Unable to load slot availability.')
   }
 
   return result
@@ -137,6 +148,7 @@ function normalizeBookingPayload(booking) {
 
   return {
     ...booking,
+    action: 'createBooking',
     name,
     customerName: name,
     email,
@@ -171,8 +183,11 @@ function normalizeBookingPayload(booking) {
     totalPrice,
     packagePrice: totalPrice,
     price: totalPrice,
+    groupSize: Number(booking?.groupSize || booking?.players || 0),
+    group_size: Number(booking?.groupSize || booking?.players || 0),
     players: Number(booking?.players || booking?.groupSize || 0),
     numberOfPlayers: Number(booking?.players || booking?.groupSize || 0),
+    remoteSpots: Number(booking?.groupSize || booking?.players || 0),
     source: booking?.source || 'website',
     toastieSelection,
     toastieChoice: toastieSelection,
@@ -214,24 +229,34 @@ function redactBookingForLog(payload) {
   }
 }
 
-function normalizeAvailability(availability) {
+export function normalizeAvailability(availability, maxCapacity = BOOKING_CONFIG.maxCapacity) {
+  if (!Array.isArray(availability) && Array.isArray(availability?.slots)) {
+    return normalizeAvailability(availability.slots, maxCapacity)
+  }
   if (!Array.isArray(availability) && Array.isArray(availability?.data)) {
-    return normalizeAvailability(availability.data)
+    return normalizeAvailability(availability.data, maxCapacity)
   }
 
   if (!Array.isArray(availability) && Array.isArray(availability?.value)) {
-    return normalizeAvailability(availability.value)
+    return normalizeAvailability(availability.value, maxCapacity)
   }
 
   if (Array.isArray(availability)) {
     return availability.reduce((slots, item, index) => {
       const slot = normalizeSlotLabel(item?.slot || item?.slotTime || item?.time, index)
       if (!slot) return slots
-      const isFull = String(item.status || '').toUpperCase() === 'FULLY BOOKED'
-      const hasAvailable = item.available !== undefined && item.available !== null && item.available !== ''
+      if (isCancelledBooking(item)) return slots
 
-      if (isFull || hasAvailable) {
-        const available = isFull ? 0 : Math.max(Number(item.available ?? BOOKING_CONFIG.maxCapacity), 0)
+      const isFull = isFullStatus(item.status) || item.full === true || item.isFull === true
+      const explicitAvailable = firstNumericValue(item.available, item.remaining, item.remainingSpots, item.spotsAvailable)
+      const explicitUsed = firstNumericValue(item.usedSpots, item.spotsUsed, item.bookedSpots, item.used)
+
+      if (isFull || explicitAvailable !== null || explicitUsed !== null) {
+        const available = isFull
+          ? 0
+          : explicitAvailable !== null
+            ? clampAvailability(explicitAvailable, maxCapacity)
+            : clampAvailability(maxCapacity - explicitUsed, maxCapacity)
         slots[slot] = {
           available,
           status: isFull ? 'full' : getSlotStatus(available)
@@ -239,8 +264,9 @@ function normalizeAvailability(availability) {
         return slots
       }
 
-      const currentAvailable = slots[slot]?.available ?? BOOKING_CONFIG.maxCapacity
-      const available = Math.max(currentAvailable - 1, 0)
+      const currentAvailable = slots[slot]?.available ?? maxCapacity
+      const usedByBooking = getBookingGroupSize(item)
+      const available = clampAvailability(currentAvailable - usedByBooking, maxCapacity)
       slots[slot] = { available, status: getSlotStatus(available) }
       return slots
     }, {})
@@ -248,23 +274,70 @@ function normalizeAvailability(availability) {
 
   return Object.entries(availability || {}).reduce((slots, [slot, value]) => {
     if (typeof value === 'object' && value !== null) {
-      const isFull = String(value.status || '').toUpperCase() === 'FULLY BOOKED'
-      const available = isFull ? 0 : Number(value.available ?? 0)
+      if (isCancelledBooking(value)) return slots
+      const isFull = isFullStatus(value.status) || value.full === true || value.isFull === true
+      const explicitAvailable = firstNumericValue(value.available, value.remaining, value.remainingSpots, value.spotsAvailable)
+      const explicitUsed = firstNumericValue(value.usedSpots, value.spotsUsed, value.bookedSpots, value.used)
+      const available = isFull
+        ? 0
+        : explicitAvailable !== null
+          ? clampAvailability(explicitAvailable, maxCapacity)
+          : explicitUsed !== null
+            ? clampAvailability(maxCapacity - explicitUsed, maxCapacity)
+            : clampAvailability(maxCapacity - getBookingGroupSize(value), maxCapacity)
       slots[slot] = {
         available,
         status: isFull ? 'full' : getSlotStatus(available)
       }
     } else {
-      const bookedCount = Number(value || 0)
-      const available = Math.max(BOOKING_CONFIG.maxCapacity - bookedCount, 0)
+      const usedSpots = Number(value || 0)
+      const available = clampAvailability(maxCapacity - usedSpots, maxCapacity)
       slots[slot] = { available, status: getSlotStatus(available) }
     }
     return slots
   }, {})
 }
 
+function firstNumericValue(...values) {
+  const value = values.find((candidate) => candidate !== undefined && candidate !== null && candidate !== '')
+  if (value === undefined) return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+function getBookingGroupSize(item) {
+  const value = firstNumericValue(
+    item?.groupSize,
+    item?.group_size,
+    item?.players,
+    item?.numberOfPlayers,
+    item?.remoteSpots,
+    item?.spots
+  )
+  return Math.max(value ?? 1, 1)
+}
+
+function isCancelledBooking(item) {
+  const status = String(item?.status || item?.bookingStatus || item?.adminStatus || '').trim().toLowerCase()
+  return ['cancelled', 'canceled'].includes(status)
+}
+
+function isFullStatus(status) {
+  const normalized = String(status || '').trim().toUpperCase()
+  return normalized === 'FULLY BOOKED' || normalized === 'SOLD OUT' || normalized === 'FULL'
+}
+
+function clampAvailability(value, maxCapacity = BOOKING_CONFIG.maxCapacity) {
+  return Math.min(Math.max(Number(value) || 0, 0), maxCapacity)
+}
+
 function normalizeSlotLabel(slot) {
   if (slot === undefined || slot === null || slot === '') return ''
+
+  const rangeMatch = String(slot).trim().match(/^(\d{1,2}:\d{2}\s[AP]M)\s*[-–]\s*(\d{1,2}:\d{2}\s[AP]M)$/i)
+  if (rangeMatch) {
+    return `${normalizeSlotLabel(rangeMatch[1])} - ${normalizeSlotLabel(rangeMatch[2])}`
+  }
 
   if (typeof slot === 'string' && /^\d{2}:\d{2}\s[AP]M$/i.test(slot.trim())) {
     return slot.trim().toUpperCase()
@@ -283,6 +356,17 @@ function getSlotStatus(available) {
   if (available <= 0) return 'full'
   if (available <= 2) return 'almost-full'
   return 'available'
+}
+
+export function canGroupFitSlot(slot, groupSize, maxCapacity = BOOKING_CONFIG.maxCapacity) {
+  const requestedSpots = Number(groupSize)
+  return Boolean(
+    slot &&
+    slot.status !== 'full' &&
+    requestedSpots >= 1 &&
+    requestedSpots <= maxCapacity &&
+    requestedSpots <= Number(slot.available)
+  )
 }
 
 function getDefaultSlotStartTimes() {
@@ -313,8 +397,10 @@ export function formatDateKey(date) {
   return `${year}-${month}-${day}`
 }
 
-export function isOperatingDay(date) {
-  return BOOKING_CONFIG.operatingDays.includes(date.getDay())
+export function isOperatingDay(date, runtimeConfig = BOOKING_CONFIG) {
+  const key = formatDateKey(date)
+  const blocked = [...(runtimeConfig.holidayDates || []), ...(runtimeConfig.blackoutDates || [])]
+  return runtimeConfig.operatingDays.includes(date.getDay()) && !blocked.includes(key)
 }
 
 export function isPastDate(date) {
@@ -324,7 +410,7 @@ export function isPastDate(date) {
   return target < today
 }
 
-export function getAvailableDates() {
+export function getAvailableDates(runtimeConfig = BOOKING_CONFIG) {
   const dates = []
   const today = getAucklandToday()
 
@@ -332,7 +418,7 @@ export function getAvailableDates() {
     const date = new Date(today)
     date.setDate(date.getDate() + i)
 
-    if (isOperatingDay(date)) {
+    if (isOperatingDay(date, runtimeConfig)) {
       dates.push(new Date(date))
     }
   }
@@ -352,7 +438,7 @@ export function getAucklandToday() {
   return new Date(Number(values.year), Number(values.month) - 1, Number(values.day))
 }
 
-export function validateBookingData(data) {
+export function validateBookingData(data, runtimeConfig = BOOKING_CONFIG) {
   const errors = {}
 
   if (!data.name || data.name.trim().length < 2) {
@@ -369,16 +455,17 @@ export function validateBookingData(data) {
   }
 
   const groupSize = Number(data.groupSize)
-  if (!groupSize || groupSize < 1) {
-    errors.groupSize = 'Please enter your group size'
+  const maximumGroupSize = Number(runtimeConfig.maximumGroupSize || runtimeConfig.maxCapacity || BOOKING_CONFIG.maxCapacity)
+  if (!groupSize || groupSize < 1 || groupSize > maximumGroupSize) {
+    errors.groupSize = `Please enter between 1 and ${maximumGroupSize} remote spots`
   }
 
   if (!data.date) {
     errors.date = 'Please select a date'
   } else if (isPastDate(data.date)) {
     errors.date = 'Please select today or a future date'
-  } else if (!isOperatingDay(data.date)) {
-    errors.date = 'Please select a Monday to Friday date'
+  } else if (!isOperatingDay(data.date, runtimeConfig)) {
+    errors.date = 'Please select an available booking date'
   }
 
   if (data.slotIndex === null || data.slotIndex === undefined) {

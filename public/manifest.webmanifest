@@ -1,0 +1,18 @@
+{
+  "name": "Remote Control Cafe Rewards",
+  "short_name": "RCC Rewards",
+  "description": "Open your RCC digital reward card, offers and stamp progress.",
+  "start_url": "/rewards",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/logo-rc-cafe-v2.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

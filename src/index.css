@@ -73,7 +73,7 @@ html, body {
     @apply text-[11px] uppercase tracking-widest font-bold text-muted;
   }
   .field-input {
-    @apply mt-1.5 w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-charcoal-300 placeholder:text-muted/60 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-400/20;
+    @apply mt-1.5 w-full rounded-xl border border-border bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-charcoal-300 placeholder:text-muted/60 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-400/20;
   }
 }
 
@@ -83,4 +83,39 @@ html, body {
     linear-gradient(rgba(20,20,20,0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(20,20,20,0.04) 1px, transparent 1px);
   background-size: 48px 48px;
+}
+
+@keyframes moment-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-50%)); }
+}
+
+.moment-track {
+  animation: moment-marquee 42s linear infinite;
+  will-change: transform;
+}
+
+.moment-track-reverse {
+  animation-direction: reverse;
+  animation-duration: 48s;
+}
+
+.moment-marquee:hover .moment-track {
+  animation-play-state: paused;
+}
+
+@media (max-width: 639px) {
+  .moment-marquee {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .moment-marquee::-webkit-scrollbar { display: none; }
+  .moment-track { animation: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moment-track { animation: none; }
 }
