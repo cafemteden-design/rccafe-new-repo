@@ -236,7 +236,7 @@ function handleBookingAction_(action, payload) {
   var previous = existing ? existing.values : {};
   var oldStatus = normalizeStatus(previous.Status || 'Confirmed');
   var targetStatus = booking.Status;
-  if (action === 'bookingCreated' || action === 'backupBooking') targetStatus = 'Confirmed';
+  if (action === 'bookingCreated' || action === 'backupBooking') targetStatus = targetStatus === 'Pending' ? 'Pending' : 'Confirmed';
   if (action === 'bookingCancelled') targetStatus = 'Cancelled';
   booking.Status = normalizeStatus(targetStatus);
   booking['Last Updated'] = formatDateTime(new Date());
@@ -475,11 +475,163 @@ function handleLeadAction_(sheetName, recipientType, payload) {
 }
 
 function handleSendEmail_(payload) {
+  var emailType = safeString(payload.emailType || payload.email_type).toLowerCase().replace(/[_\s-]+/g, '_');
+  if (emailType === 'booking_confirmed') return handleBookingConfirmedEmail_(payload);
+  if (emailType === 'booking_rejected') return handleBookingRejectedEmail_(payload);
+  if (emailType === 'booking_cancelled') return handleBookingCancelledEmail_(payload);
   requireAnyRaw_(payload, ['to', 'recipient_email', 'recipientEmail'], 'Recipient email is required.');
   if (!safeString(payload.subject)) throw apiError_('VALIDATION_ERROR', 'Email subject is required.');
   var result = sendEmailSafe(firstValue_(payload.to, payload.recipient_email, payload.recipientEmail), payload.subject,
     firstValue_(payload.html_body, payload.htmlBody, payload.body), firstValue_(payload.plain_body, payload.plainBody, payload.body), payload.metadata || payload);
   return { success: result.status === 'Sent', referenceId: result.emailLogId, rowsAffected: 1, message: result.message, emailStatus: result.status };
+}
+
+function handleBookingConfirmedEmail_(payload) {
+  var booking = normalizeBookingPayload_(payload);
+  var recipientEmail = firstValue_(booking.Email, payload.email, payload.customer_email);
+  if (!recipientEmail) throw apiError_('VALIDATION_ERROR', 'Customer email is required for confirmation email.');
+  var bookingId = firstValue_(booking['Booking ID'], payload.booking_id);
+  if (!bookingId) throw apiError_('VALIDATION_ERROR', 'Booking ID is required.');
+
+  if (isDuplicateEmail_('Booking Confirmed', bookingId, recipientEmail)) {
+    return { success: true, referenceId: bookingId, rowsAffected: 0, message: 'Confirmation email already sent.', emailStatus: 'Already Sent', duplicate: true };
+  }
+
+  var config = getConfig();
+  var customerName = firstValue_(booking['Customer Name'], payload.customer_name, 'Customer');
+  var cancellationText = 'To request a cancellation, please reply to this email or contact Remote Control Cafe with your booking reference, name, booking date and booking time. Cancellation requests should be submitted at least 30 minutes before the scheduled booking time. Your booking remains confirmed until you receive a cancellation confirmation from our team.';
+
+  var htmlBody = brandedEmailHtml_('Booking Confirmed',
+    '<p>Hi ' + escapeHtml_(customerName) + ',</p>' +
+    '<p>Great news! Your Remote Control Cafe booking has been <strong style="color:#16a34a">confirmed</strong>.</p>' +
+    bookingDetailsHtml_(booking) +
+    '<p><strong>Status:</strong> <span style="color:#16a34a">Confirmed</span></p>' +
+    '<p style="margin-top:16px;padding:12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">' +
+    '<strong>What to expect:</strong> Please arrive at Remote Control Cafe at your booked time. Your toastie and coffee will be prepared fresh for you.</p>' +
+    '<p style="font-size:13px;color:#6b7280">' + escapeHtml_(cancellationText) + '</p>' +
+    '<p>See you soon!<br><strong>Remote Control Cafe</strong><br>' + escapeHtml_(config.businessEmail) + '</p>');
+
+  var plainBody = 'Hi ' + customerName + ',\n\n' +
+    'Great news! Your Remote Control Cafe booking has been confirmed.\n\n' +
+    bookingDetailsText_(booking) +
+    '\nStatus: Confirmed\n\n' +
+    'What to expect: Please arrive at Remote Control Cafe at your booked time. Your toastie and coffee will be prepared fresh for you.\n\n' +
+    cancellationText + '\n\n' +
+    'See you soon!\nRemote Control Cafe\n' + config.businessEmail;
+
+  var customerResult = sendEmailSafe(recipientEmail, 'Booking Confirmed - ' + bookingId, htmlBody, plainBody,
+    bookingEmailMetadata_(booking, 'Booking Confirmed', recipientEmail));
+
+  if (config.enableAdminEmails) {
+    var admins = uniqueEmails_(config.adminEmails);
+    sendEmailSafe(admins.join(','), 'Booking Approved - ' + bookingId,
+      brandedEmailHtml_('Booking Approved', '<p>Booking <strong>' + escapeHtml_(bookingId) + '</strong> has been approved and the customer has been notified.</p>' + bookingDetailsHtml_(booking) + '<p><strong>Status:</strong> Confirmed</p>'),
+      'Booking ' + bookingId + ' has been approved.\n\n' + bookingDetailsText_(booking) + '\nStatus: Confirmed',
+      bookingEmailMetadata_(booking, 'Admin Booking Approved', admins.join(',')));
+  }
+
+  updateBookingEmailStatus_(booking, 'Customer Email Status', customerResult.status);
+
+  return { success: customerResult.status === 'Sent', referenceId: customerResult.emailLogId, bookingId: bookingId, rowsAffected: 1, message: customerResult.message, emailStatus: customerResult.status };
+}
+
+function handleBookingRejectedEmail_(payload) {
+  var booking = normalizeBookingPayload_(payload);
+  var recipientEmail = firstValue_(booking.Email, payload.email, payload.customer_email);
+  if (!recipientEmail) throw apiError_('VALIDATION_ERROR', 'Customer email is required for rejection email.');
+  var bookingId = firstValue_(booking['Booking ID'], payload.booking_id);
+  if (!bookingId) throw apiError_('VALIDATION_ERROR', 'Booking ID is required.');
+
+  if (isDuplicateEmail_('Booking Rejected', bookingId, recipientEmail)) {
+    return { success: true, referenceId: bookingId, rowsAffected: 0, message: 'Rejection email already sent.', emailStatus: 'Already Sent', duplicate: true };
+  }
+
+  var config = getConfig();
+  var customerName = firstValue_(booking['Customer Name'], payload.customer_name, 'Customer');
+  var rejectionReason = safeString(firstValue_(payload.rejectionReason, payload.rejection_reason, booking['Cancellation Reason'], 'Unfortunately, we are unable to accommodate your booking at this time.'));
+  var bookingLink = config.websiteUrl + '/booking';
+
+  var htmlBody = brandedEmailHtml_('Booking Update',
+    '<p>Hi ' + escapeHtml_(customerName) + ',</p>' +
+    '<p>Thank you for your interest in Remote Control Cafe. Unfortunately, we are unable to confirm your booking at this time.</p>' +
+    bookingDetailsHtml_(booking) +
+    '<p><strong>Status:</strong> <span style="color:#dc2626">Not Available</span></p>' +
+    '<p><strong>Reason:</strong> ' + escapeHtml_(rejectionReason) + '</p>' +
+    '<p style="margin-top:16px;padding:12px;background:#fef3c7;border-radius:8px;border:1px solid #fde68a">' +
+    'We would love to welcome you at another time! Please choose a different date or time slot that works for you.</p>' +
+    '<p style="margin-top:12px"><a href="' + escapeHtml_(bookingLink) + '" style="display:inline-block;padding:12px 24px;background:#ff6b1a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold">Choose Another Slot</a></p>' +
+    '<p style="margin-top:16px">If you have any questions, please reply to this email or contact us directly.</p>' +
+    '<p>Kind regards,<br><strong>Remote Control Cafe</strong><br>' + escapeHtml_(config.businessEmail) + '</p>');
+
+  var plainBody = 'Hi ' + customerName + ',\n\n' +
+    'Thank you for your interest in Remote Control Cafe. Unfortunately, we are unable to confirm your booking at this time.\n\n' +
+    bookingDetailsText_(booking) +
+    '\nStatus: Not Available\n' +
+    'Reason: ' + rejectionReason + '\n\n' +
+    'We would love to welcome you at another time! Please choose a different date or time slot:\n' +
+    bookingLink + '\n\n' +
+    'If you have any questions, please reply to this email or contact us directly.\n\n' +
+    'Kind regards,\nRemote Control Cafe\n' + config.businessEmail;
+
+  var customerResult = sendEmailSafe(recipientEmail, 'Booking Update - ' + bookingId, htmlBody, plainBody,
+    bookingEmailMetadata_(booking, 'Booking Rejected', recipientEmail));
+
+  if (config.enableAdminEmails) {
+    var admins = uniqueEmails_(config.adminEmails);
+    sendEmailSafe(admins.join(','), 'Booking Rejected - ' + bookingId,
+      brandedEmailHtml_('Booking Rejected', '<p>Booking <strong>' + escapeHtml_(bookingId) + '</strong> has been rejected and the customer has been notified.</p>' + bookingDetailsHtml_(booking) + '<p><strong>Reason:</strong> ' + escapeHtml_(rejectionReason) + '</p>'),
+      'Booking ' + bookingId + ' has been rejected.\n\n' + bookingDetailsText_(booking) + '\nReason: ' + rejectionReason,
+      bookingEmailMetadata_(booking, 'Admin Booking Rejected', admins.join(',')));
+  }
+
+  updateBookingEmailStatus_(booking, 'Customer Email Status', customerResult.status);
+
+  return { success: customerResult.status === 'Sent', referenceId: customerResult.emailLogId, bookingId: bookingId, rowsAffected: 1, message: customerResult.message, emailStatus: customerResult.status };
+}
+
+function handleBookingCancelledEmail_(payload) {
+  var booking = normalizeBookingPayload_(payload);
+  booking.Status = 'Cancelled';
+  sendBookingStatusEmail_(booking, 'Cancelled');
+  return { success: true, referenceId: firstValue_(booking['Booking ID'], payload.booking_id), rowsAffected: 1, message: 'Cancellation email processed.' };
+}
+
+function isDuplicateEmail_(emailType, bookingId, recipientEmail) {
+  try {
+    var sheet = getSheet(RCC_V2.sheets.emailLogs);
+    var headers = getHeaders(sheet);
+    if (sheet.getLastRow() < 2) return false;
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getDisplayValues();
+    var typeIndex = headerIndex_(headers, 'Email Type');
+    var refIndex = headerIndex_(headers, 'Booking ID');
+    var recipientIndex = headerIndex_(headers, 'Recipient Email');
+    var statusIndex = headerIndex_(headers, 'Status');
+    if (typeIndex < 0 || refIndex < 0 || statusIndex < 0) return false;
+    var targetType = normalizeKey_(emailType);
+    var targetRef = normalizeKey_(bookingId);
+    var targetRecipient = normalizeKey_(recipientEmail);
+    for (var i = 0; i < rows.length; i += 1) {
+      if (normalizeKey_(rows[i][typeIndex]) === targetType &&
+          normalizeKey_(rows[i][refIndex]) === targetRef &&
+          (recipientIndex < 0 || normalizeKey_(rows[i][recipientIndex]) === targetRecipient) &&
+          normalizeKey_(rows[i][statusIndex]) === 'sent') {
+        return true;
+      }
+    }
+  } catch (ignored) {}
+  return false;
+}
+
+function updateBookingEmailStatus_(booking, field, status) {
+  try {
+    var existing = findBookingRecord_(booking);
+    if (existing) {
+      updateRowFields_(getSheet(RCC_V2.sheets.bookings), existing.rowNumber, {
+        'Customer Email Status': status,
+        'Last Updated': formatDateTime(new Date())
+      });
+    }
+  } catch (ignored) {}
 }
 
 function handleRetryEmail_(payload) {
@@ -516,13 +668,15 @@ function refreshSystemHealth_() {
   var failedEmails = countRowsByStatus_(RCC_V2.sheets.emailLogs, 'Status', ['Failed']);
   var failedRuns = countRowsByStatus_(RCC_V2.sheets.appLogs, 'Status', ['Failed']);
   var confirmedBookings = countRowsByStatus_(RCC_V2.sheets.bookings, 'Status', ['Confirmed']);
+  var pendingBookings = countRowsByStatus_(RCC_V2.sheets.bookings, 'Status', ['Pending']);
   updateSystemHealthData_({
     'Apps Script Status': 'Healthy',
     'Email Status': failedEmails === 0 ? 'No Failed Emails' : failedEmails + ' Failed Email(s)',
     'Last Sync Time': formatDateTime(new Date()),
     'Failed Emails': failedEmails,
     'Failed Apps Script Runs': failedRuns,
-    'Confirmed Bookings': confirmedBookings
+    'Confirmed Bookings': confirmedBookings,
+    'Pending Bookings': pendingBookings
   });
 }
 
@@ -541,21 +695,42 @@ function sendBookingCreatedEmails_(booking) {
   var details = bookingDetailsText_(booking);
   var adminStatus = 'Skipped';
   var customerStatus = 'Skipped';
+  var isPending = safeString(booking.Status).toLowerCase() === 'pending';
+  var statusLabel = isPending ? 'Pending Approval' : 'Confirmed';
   if (config.enableAdminEmails) {
     var admins = uniqueEmails_(config.adminEmails);
-    var adminResult = sendEmailSafe(admins.join(','), 'New Confirmed Booking - ' + booking['Booking ID'],
-      brandedEmailHtml_('New Confirmed Booking', '<p>A new RCC booking has been confirmed.</p>' + bookingDetailsHtml_(booking) + '<p><strong>Status:</strong> Confirmed</p>'),
-      'New Confirmed Booking\n\n' + details + '\nStatus: Confirmed',
+    var adminSubject = isPending ? 'New Booking Request (Pending) - ' : 'New Confirmed Booking - ';
+    var adminResult = sendEmailSafe(admins.join(','), adminSubject + booking['Booking ID'],
+      brandedEmailHtml_(isPending ? 'New Booking Request' : 'New Confirmed Booking',
+        '<p>A new RCC booking ' + (isPending ? 'request has been received and requires approval.' : 'has been confirmed.') + '</p>' +
+        bookingDetailsHtml_(booking) +
+        '<p><strong>Status:</strong> <span style="color:' + (isPending ? '#d97706' : '#16a34a') + '">' + statusLabel + '</span></p>' +
+        (isPending ? '<p style="margin-top:12px;padding:12px;background:#fef3c7;border-radius:8px;border:1px solid #fde68a"><strong>Action required:</strong> Please review and approve or reject this booking in the admin panel.</p>' : '')),
+      (isPending ? 'New Booking Request (Pending Approval)' : 'New Confirmed Booking') + '\n\n' + details + '\nStatus: ' + statusLabel + (isPending ? '\n\nAction required: Please review and approve or reject this booking in the admin panel.' : ''),
       bookingEmailMetadata_(booking, 'Admin Booking Created', admins.join(',')));
     adminStatus = adminResult.status;
   }
   if (config.enableCustomerEmails && booking.Email) {
-    var cancellationText = 'To request a cancellation, please reply to this email or contact Remote Control Cafe with your booking reference, name, booking date and booking time. Cancellation requests should be submitted at least 30 minutes before the scheduled booking time. Your booking remains confirmed until you receive a cancellation confirmation from our team.';
-    var customerResult = sendEmailSafe(booking.Email, 'Booking Confirmed - ' + booking['Booking ID'],
-      brandedEmailHtml_('Booking Confirmed', '<p>Hi ' + escapeHtml_(booking['Customer Name']) + ',</p><p>Your Remote Control Cafe booking is confirmed.</p>' + bookingDetailsHtml_(booking) + '<p><strong>Status:</strong> Confirmed</p><p>' + escapeHtml_(cancellationText) + '</p><p>Remote Control Cafe<br>' + escapeHtml_(config.businessEmail) + '</p>'),
-      'Hi ' + booking['Customer Name'] + ',\n\nYour Remote Control Cafe booking is confirmed.\n\n' + details + '\nStatus: Confirmed\n\n' + cancellationText + '\n\nRemote Control Cafe\n' + config.businessEmail,
-      bookingEmailMetadata_(booking, 'Customer Booking Created', booking.Email));
-    customerStatus = customerResult.status;
+    if (isPending) {
+      var pendingResult = sendEmailSafe(booking.Email, 'Booking Request Received - ' + booking['Booking ID'],
+        brandedEmailHtml_('Booking Request Received',
+          '<p>Hi ' + escapeHtml_(booking['Customer Name']) + ',</p>' +
+          '<p>Thank you for your booking request at Remote Control Cafe! We have received your details and our team will review your booking shortly.</p>' +
+          bookingDetailsHtml_(booking) +
+          '<p><strong>Status:</strong> <span style="color:#d97706">Pending Approval</span></p>' +
+          '<p style="padding:12px;background:#fef3c7;border-radius:8px;border:1px solid #fde68a">You will receive a confirmation email once your booking has been approved. Most bookings are reviewed within a few hours.</p>' +
+          '<p>Remote Control Cafe<br>' + escapeHtml_(config.businessEmail) + '</p>'),
+        'Hi ' + booking['Customer Name'] + ',\n\nThank you for your booking request at Remote Control Cafe! We have received your details and our team will review your booking shortly.\n\n' + details + '\nStatus: Pending Approval\n\nYou will receive a confirmation email once your booking has been approved. Most bookings are reviewed within a few hours.\n\nRemote Control Cafe\n' + config.businessEmail,
+        bookingEmailMetadata_(booking, 'Customer Booking Pending', booking.Email));
+      customerStatus = pendingResult.status;
+    } else {
+      var cancellationText = 'To request a cancellation, please reply to this email or contact Remote Control Cafe with your booking reference, name, booking date and booking time. Cancellation requests should be submitted at least 30 minutes before the scheduled booking time. Your booking remains confirmed until you receive a cancellation confirmation from our team.';
+      var customerResult = sendEmailSafe(booking.Email, 'Booking Confirmed - ' + booking['Booking ID'],
+        brandedEmailHtml_('Booking Confirmed', '<p>Hi ' + escapeHtml_(booking['Customer Name']) + ',</p><p>Your Remote Control Cafe booking is confirmed.</p>' + bookingDetailsHtml_(booking) + '<p><strong>Status:</strong> Confirmed</p><p>' + escapeHtml_(cancellationText) + '</p><p>Remote Control Cafe<br>' + escapeHtml_(config.businessEmail) + '</p>'),
+        'Hi ' + booking['Customer Name'] + ',\n\nYour Remote Control Cafe booking is confirmed.\n\n' + details + '\nStatus: Confirmed\n\n' + cancellationText + '\n\nRemote Control Cafe\n' + config.businessEmail,
+        bookingEmailMetadata_(booking, 'Customer Booking Created', booking.Email));
+      customerStatus = customerResult.status;
+    }
   }
   return { admin: adminStatus, customer: customerStatus };
 }
@@ -846,7 +1021,9 @@ function writeRewardActivityLog(data) { return appendLog(RCC_V2.sheets.rewardAct
 
 function normalizeStatus(status) {
   var value = safeString(status).toLowerCase().replace(/[_-]+/g, ' ');
-  if (value === 'confirmed') return 'Confirmed';
+  if (value === 'pending') return 'Pending';
+  if (value === 'confirmed' || value === 'approved') return 'Confirmed';
+  if (value === 'rejected') return 'Rejected';
   if (value === 'cancelled' || value === 'canceled') return 'Cancelled';
   if (value === 'completed') return 'Completed';
   if (value === 'no show' || value === 'noshow') return 'No Show';
