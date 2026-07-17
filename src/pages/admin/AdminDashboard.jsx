@@ -26,7 +26,7 @@ export default function AdminDashboard() {
     const results=await Promise.all([
       supabase.rpc('get_admin_dashboard_stats'),
       supabase.from('bookings_mirror').select('*').eq('booking_date',today).order('booking_time').limit(16),
-      supabase.from('bookings_mirror').select('*').eq('status','confirmed').order('booking_date',{ascending:true}).order('booking_time',{ascending:true}).limit(8),
+      supabase.from('bookings_mirror').select('*').in('status',['confirmed','approved']).order('booking_date',{ascending:true}).order('booking_time',{ascending:true}).limit(8),
       supabase.from('reward_cards').select('id,rcc_card_id,full_name,current_stamps,cycle_number,reward_status,created_at').order('created_at',{ascending:false}).limit(6),
       supabase.from('reward_events').select('id,event_type,stamp_change,created_at,reward_cards(rcc_card_id,full_name)').order('created_at',{ascending:false}).limit(6),
       supabase.from('website_leads').select('id,full_name,enquiry_type,status,created_at').order('created_at',{ascending:false}).limit(6),

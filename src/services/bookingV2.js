@@ -1,7 +1,11 @@
 import { supabase } from '../lib/supabaseClient.js'
 import { BOOKING_DRINK_CHOICES } from '../data/menu.js'
 
-export const BOOKING_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed', 'no_show']
+export const BOOKING_STATUSES = ['pending', 'confirmed', 'approved', 'cancelled', 'completed', 'no_show']
+
+export function isConfirmedStatus(status) {
+  return status === 'confirmed' || status === 'approved'
+}
 export const BOOKING_DRINK_VALUES = BOOKING_DRINK_CHOICES
 
 export async function createPendingBooking(booking) {
@@ -21,8 +25,7 @@ export async function createPendingBooking(booking) {
     p_toastie_selection: booking.toastieSelection || booking.toastieChoice || null,
     p_drink_selection: drinkSelection,
     p_notes: booking.notes || null,
-    p_source: booking.source || 'website',
-    p_booking_reference: booking.booking_id || booking.bookingId || null
+    p_source: booking.source || 'website'
   }
   const { data, error } = await supabase.rpc('create_booking_request_v4', {
     ...baseArgs,
@@ -30,8 +33,7 @@ export async function createPendingBooking(booking) {
     p_per_remote_selections: booking.perRemoteSelections || booking.per_remote_selections || []
   })
   if (error && isMissingRpc(error, 'create_booking_request_v4')) {
-    const { p_booking_reference, ...fallbackArgs } = baseArgs
-    const fallback = await supabase.rpc('create_booking_request_v3', fallbackArgs)
+    const fallback = await supabase.rpc('create_booking_request_v3', baseArgs)
     if (fallback.error) throw fallback.error
     return fallback.data
   }

@@ -6,12 +6,13 @@ import { useAdminAuth } from '../../admin/AdminAuthContext.jsx'
 import { AdminAlert, AdminBadge, AdminEmpty, AdminModal, AdminPageHeader, AdminSkeleton } from '../../components/admin/AdminUI.jsx'
 import { useToast } from '../../components/admin/ToastContext.jsx'
 import { bookingToSheetPayload, syncGoogleSheet } from '../../services/googleSheetSync.js'
-import { approveBooking, cancelBooking, markConfirmationEmailSent, markRejectionEmailSent, rejectBooking, updateBookingStatus } from '../../services/bookingV2.js'
+import { approveBooking, cancelBooking, isConfirmedStatus, markConfirmationEmailSent, markRejectionEmailSent, rejectBooking, updateBookingStatus } from '../../services/bookingV2.js'
 import { BOOKING_DRINK_CHOICES, TOASTIE_CHOICES } from '../../data/menu.js'
 import { generateHourlySlots } from '../../data/businessHours.js'
 import { useBookingSettings } from '../../hooks/useBookingSettings.js'
 
 const FILTERS = ['all', 'pending', 'confirmed', 'cancelled', 'completed', 'no_show']
+const CONFIRMED_STATUSES = ['confirmed', 'approved']
 const MANAGE_ROLES = ['super_admin', 'admin', 'manager']
 const PREP_ROLES = ['super_admin', 'admin', 'manager', 'staff']
 
@@ -67,14 +68,14 @@ export default function AdminBookingsV2() {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return rows.filter((row) =>
-      (filter === 'all' || row.status === filter) &&
+      (filter === 'all' || (filter === 'confirmed' ? isConfirmedStatus(row.status) : row.status === filter)) &&
       (!dateFilter || row.booking_date === dateFilter) &&
       (!slotFilter || row.booking_time === slotFilter) &&
       (!needle || [row.booking_id, row.customer_name, row.customer_phone, row.customer_email, row.booking_date, row.booking_time, row.drink_selection, row.toastie_selection].some((value) => String(value || '').toLowerCase().includes(needle)))
     )
   }, [rows, filter, query, dateFilter, slotFilter])
 
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((item) => [item, item === 'all' ? rows.length : rows.filter((row) => row.status === item).length])), [rows])
+  const counts = useMemo(() => Object.fromEntries(FILTERS.map((item) => [item, item === 'all' ? rows.length : item === 'confirmed' ? rows.filter((row) => isConfirmedStatus(row.status)).length : rows.filter((row) => row.status === item).length])), [rows])
 
   const replaceRow = (row) => {
     setRows((current) => current.map((item) => item.id === row.id ? row : item))
@@ -311,7 +312,7 @@ export default function AdminBookingsV2() {
 }
 
 function BookingDesktopRow({ booking, canManage, working, onView, onApprove, onReject, onCancel, onComplete, onNoShow }) {
-  return <tr className="text-sm"><td className="px-4 py-3 font-mono text-xs font-bold">{booking.booking_id}</td><td className="px-4 py-3"><div className="font-bold">{booking.customer_name}</div><div className="text-xs text-muted">{booking.customer_phone}</div></td><td className="px-4 py-3"><div className="font-bold">{booking.booking_date}</div><div className="text-xs text-muted">{booking.booking_time}</div></td><td className="px-4 py-3"><div className="font-extrabold">{booking.group_size}</div><div className="text-xs text-muted">{foodSelectionStatus(booking)}</div></td><td className="px-4 py-3">{booking.gameplay_duration || booking.package_duration} min</td><td className="px-4 py-3 font-bold">${Number(booking.total_price || booking.package_price || 0).toFixed(2)}</td><td className="px-4 py-3"><AdminBadge value={booking.status} /></td><td className="px-4 py-3"><div className="flex justify-end gap-1"><button className="grid h-10 w-10 place-items-center rounded-lg border border-border" onClick={() => onView(booking)} title="View details"><Eye size={16} /></button>{canManage && booking.status === 'pending' && <><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-green-200 text-green-700 disabled:opacity-30" onClick={() => onApprove(booking)} title="Approve booking"><ThumbsUp size={16} /></button><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-red-200 text-red-700 disabled:opacity-30" onClick={() => onReject(booking)} title="Reject booking"><ThumbsDown size={16} /></button></>}{canManage && booking.status === 'confirmed' && <><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-green-200 text-green-700 disabled:opacity-30" onClick={() => onComplete(booking)} title="Mark completed"><CheckCircle2 size={16} /></button><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-red-200 text-red-700 disabled:opacity-30" onClick={() => onNoShow(booking)} title="Mark no show"><XCircle size={16} /></button><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-border disabled:opacity-30" onClick={() => onCancel(booking)} title="Cancel Booking"><Ban size={16} /></button></>}</div></td></tr>
+  return <tr className="text-sm"><td className="px-4 py-3 font-mono text-xs font-bold">{booking.booking_id}</td><td className="px-4 py-3"><div className="font-bold">{booking.customer_name}</div><div className="text-xs text-muted">{booking.customer_phone}</div></td><td className="px-4 py-3"><div className="font-bold">{booking.booking_date}</div><div className="text-xs text-muted">{booking.booking_time}</div></td><td className="px-4 py-3"><div className="font-extrabold">{booking.group_size}</div><div className="text-xs text-muted">{foodSelectionStatus(booking)}</div></td><td className="px-4 py-3">{booking.gameplay_duration || booking.package_duration} min</td><td className="px-4 py-3 font-bold">${Number(booking.total_price || booking.package_price || 0).toFixed(2)}</td><td className="px-4 py-3"><AdminBadge value={booking.status} /></td><td className="px-4 py-3"><div className="flex justify-end gap-1"><button className="grid h-10 w-10 place-items-center rounded-lg border border-border" onClick={() => onView(booking)} title="View details"><Eye size={16} /></button>{canManage && booking.status === 'pending' && <><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-green-200 text-green-700 disabled:opacity-30" onClick={() => onApprove(booking)} title="Approve booking"><ThumbsUp size={16} /></button><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-red-200 text-red-700 disabled:opacity-30" onClick={() => onReject(booking)} title="Reject booking"><ThumbsDown size={16} /></button></>}{canManage && isConfirmedStatus(booking.status) && <><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-green-200 text-green-700 disabled:opacity-30" onClick={() => onComplete(booking)} title="Mark completed"><CheckCircle2 size={16} /></button><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-red-200 text-red-700 disabled:opacity-30" onClick={() => onNoShow(booking)} title="Mark no show"><XCircle size={16} /></button><button disabled={working} className="grid h-10 w-10 place-items-center rounded-lg border border-border disabled:opacity-30" onClick={() => onCancel(booking)} title="Cancel Booking"><Ban size={16} /></button></>}</div></td></tr>
 }
 
 function BookingRow({ booking, canManage, canPrep, working, onView, onEdit, onSync, onEmail, onFood, onApprove, onReject, onCancel, onComplete, onNoShow }) {
@@ -329,9 +330,9 @@ function BookingRow({ booking, canManage, canPrep, working, onView, onEdit, onSy
       {canManage && booking.status === 'pending' && <IconAction icon={ThumbsDown} label="Reject" tone="red" disabled={working} onClick={() => onReject(booking)} />}
       {canPrep && <IconAction icon={Utensils} label={booking.food_prepared ? 'Food Ready' : 'Prep Food'} tone={booking.food_prepared ? 'green' : undefined} disabled={working} onClick={() => onFood(booking)} />}
       {canManage && <IconAction icon={Edit3} label="Edit" onClick={() => onEdit(booking)} />}
-      {canManage && booking.status === 'confirmed' && <IconAction icon={CheckCircle2} label="Completed" tone="green" disabled={working} onClick={() => onComplete(booking)} />}
-      {canManage && booking.status === 'confirmed' && <IconAction icon={XCircle} label="No Show" tone="red" disabled={working} onClick={() => onNoShow(booking)} />}
-      {canManage && (booking.status === 'confirmed' || booking.status === 'pending') && <IconAction icon={Ban} label="Cancel" disabled={working} onClick={() => onCancel(booking)} />}
+      {canManage && isConfirmedStatus(booking.status) && <IconAction icon={CheckCircle2} label="Completed" tone="green" disabled={working} onClick={() => onComplete(booking)} />}
+      {canManage && isConfirmedStatus(booking.status) && <IconAction icon={XCircle} label="No Show" tone="red" disabled={working} onClick={() => onNoShow(booking)} />}
+      {canManage && (isConfirmedStatus(booking.status) || booking.status === 'pending') && <IconAction icon={Ban} label="Cancel" disabled={working} onClick={() => onCancel(booking)} />}
       {canManage && <IconAction icon={Mail} label="Email" disabled={working} onClick={() => onEmail(booking)} />}
       {canManage && <IconAction icon={Sheet} label="Sync" disabled={working} onClick={() => onSync(booking)} />}
     </div>
@@ -340,7 +341,7 @@ function BookingRow({ booking, canManage, canPrep, working, onView, onEdit, onSy
 
 function BookingDetail({ booking, canManage, working, onClose, onEdit, onApprove, onReject, onCancel, onComplete, onNoShow, onSync, onEmail }) {
   const fields = [['Booking Reference', booking.booking_id], ['Date', booking.booking_date], ['Time Slot', booking.slot_label || booking.booking_time], ['Remote Spots', booking.group_size], ['Gameplay', `${booking.gameplay_duration || booking.package_duration || '-'} minutes`], ['Payment', booking.payment_status], ['Total', `NZD $${Number(booking.total_price || booking.package_price || 0).toFixed(2)}`], ['Phone', booking.customer_phone], ['Email', booking.customer_email], ['Notes', booking.notes], ['Admin Notes', booking.admin_notes], ['Approved At', booking.approved_at], ['Rejected At', booking.rejected_at], ['Rejection Reason', booking.rejection_reason], ['Cancelled At', booking.cancelled_at], ['Cancellation Reason', booking.cancellation_reason], ['Cancelled By', booking.cancelled_by]]
-  return <AdminModal title={booking.customer_name || 'Booking'} description={`${booking.booking_id || ''} | ${labelStatus(booking.status)}`} onClose={onClose} footer={<div className="flex flex-wrap justify-end gap-2">{canManage && booking.status === 'pending' && <><button className="btn-primary" disabled={working} onClick={() => onApprove(booking)}><ThumbsUp size={16} />Approve</button><button className="btn-outline" disabled={working} onClick={() => onReject(booking)}><ThumbsDown size={16} />Reject</button></>}{canManage && <button className="btn-outline" onClick={onEdit}><Edit3 size={16} />Edit</button>}<button className="btn-outline" disabled={working} onClick={() => onEmail(booking)}><Mail size={16} />Resend Email</button><button className="btn-outline" disabled={working} onClick={() => onSync(booking)}><Sheet size={16} />Sync Sheet</button>{canManage && booking.status === 'confirmed' && <><button className="btn-outline" disabled={working} onClick={() => onComplete(booking)}><CheckCircle2 size={16} />Completed</button><button className="btn-outline" disabled={working} onClick={() => onNoShow(booking)}><XCircle size={16} />No Show</button><button className="btn-primary" disabled={working} onClick={() => onCancel(booking)}><Ban size={16} />Cancel</button></>}</div>}><div className="grid gap-3 sm:grid-cols-2">{fields.map(([label, value]) => <Cell key={label} label={label} value={value || '-'} />)}</div><FoodBreakdown booking={booking} /></AdminModal>
+  return <AdminModal title={booking.customer_name || 'Booking'} description={`${booking.booking_id || ''} | ${labelStatus(booking.status)}`} onClose={onClose} footer={<div className="flex flex-wrap justify-end gap-2">{canManage && booking.status === 'pending' && <><button className="btn-primary" disabled={working} onClick={() => onApprove(booking)}><ThumbsUp size={16} />Approve</button><button className="btn-outline" disabled={working} onClick={() => onReject(booking)}><ThumbsDown size={16} />Reject</button></>}{canManage && <button className="btn-outline" onClick={onEdit}><Edit3 size={16} />Edit</button>}<button className="btn-outline" disabled={working} onClick={() => onEmail(booking)}><Mail size={16} />Resend Email</button><button className="btn-outline" disabled={working} onClick={() => onSync(booking)}><Sheet size={16} />Sync Sheet</button>{canManage && isConfirmedStatus(booking.status) && <><button className="btn-outline" disabled={working} onClick={() => onComplete(booking)}><CheckCircle2 size={16} />Completed</button><button className="btn-outline" disabled={working} onClick={() => onNoShow(booking)}><XCircle size={16} />No Show</button><button className="btn-primary" disabled={working} onClick={() => onCancel(booking)}><Ban size={16} />Cancel</button></>}</div>}><div className="grid gap-3 sm:grid-cols-2">{fields.map(([label, value]) => <Cell key={label} label={label} value={value || '-'} />)}</div><FoodBreakdown booking={booking} /></AdminModal>
 }
 
 function CancelBookingModal({ booking, working, onClose, onConfirm }) {
@@ -437,6 +438,7 @@ function isMissingRpc(error, name) {
 }
 
 function labelStatus(value) {
+  if (value === 'approved') return 'Confirmed'
   const text = String(value || '').replaceAll('_', ' ')
   return text ? text[0].toUpperCase() + text.slice(1) : 'All'
 }

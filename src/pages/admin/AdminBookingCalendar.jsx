@@ -60,7 +60,7 @@ export default function AdminBookingCalendar() {
     const [dateRes, slotRes, bookingRes] = await Promise.all([
       supabase.from('booking_date_overrides').select('*').gte('booking_date', startDate).lte('booking_date', endDate),
       supabase.from('booking_slot_overrides').select('*').gte('booking_date', startDate).lte('booking_date', endDate),
-      supabase.from('bookings_mirror').select('booking_date,booking_time,group_size,status').gte('booking_date', startDate).lte('booking_date', endDate).in('status', ['pending', 'confirmed'])
+      supabase.from('bookings_mirror').select('booking_date,booking_time,group_size,status').gte('booking_date', startDate).lte('booking_date', endDate).in('status', ['pending', 'confirmed', 'approved'])
     ])
     if (dateRes.error) setError(dateRes.error.message)
     const dateMap = {}
@@ -76,13 +76,13 @@ export default function AdminBookingCalendar() {
 
     const countMap = {}
     for (const row of bookingRes.data || []) {
-      const key = `${row.booking_date}|${row.booking_time}`
+      const normalizedStatus = row.status === 'approved' ? 'confirmed' : row.status
       if (!countMap[row.booking_date]) countMap[row.booking_date] = { total: 0, pending: 0, confirmed: 0, slots: {} }
       const remotes = Number(row.group_size || 0)
       countMap[row.booking_date].total += remotes
-      countMap[row.booking_date][row.status] = (countMap[row.booking_date][row.status] || 0) + remotes
+      countMap[row.booking_date][normalizedStatus] = (countMap[row.booking_date][normalizedStatus] || 0) + remotes
       if (!countMap[row.booking_date].slots[row.booking_time]) countMap[row.booking_date].slots[row.booking_time] = { pending: 0, confirmed: 0, total: 0 }
-      countMap[row.booking_date].slots[row.booking_time][row.status] = (countMap[row.booking_date].slots[row.booking_time][row.status] || 0) + remotes
+      countMap[row.booking_date].slots[row.booking_time][normalizedStatus] = (countMap[row.booking_date].slots[row.booking_time][normalizedStatus] || 0) + remotes
       countMap[row.booking_date].slots[row.booking_time].total += remotes
     }
     setBookingCounts(countMap)
