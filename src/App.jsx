@@ -42,6 +42,7 @@ const AdminRewardsManager = lazy(() => import('./pages/admin/AdminRewardsManager
 const AdminDiagnostics = lazy(() => import('./pages/admin/AdminDiagnostics.jsx'))
 const AdminBookingSettings = lazy(() => import('./pages/admin/AdminBookingSettings.jsx'))
 const AdminBookingsV2 = lazy(() => import('./pages/admin/AdminBookingsV2.jsx'))
+const AdminBookingCalendar = lazy(() => import('./pages/admin/AdminBookingCalendar.jsx'))
 const AdminSiteSettings = lazy(() => import('./pages/admin/AdminSiteSettings.jsx'))
 
 function ScrollToTop() {
@@ -106,6 +107,7 @@ export default function App() {
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="bookings" element={<AdminBookingsV2 />} />
+            <Route path="booking-calendar" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminBookingCalendar /></ProtectedAdminRoute>} />
             <Route path="customers" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="customers" /></ProtectedAdminRoute>} />
             <Route path="rewards" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminRewardsManager /></ProtectedAdminRoute>} />
             <Route path="rewards/scanner" element={<AdminRewardScanner />} />

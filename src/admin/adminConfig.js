@@ -1,5 +1,5 @@
 import {
-  Activity, Bell, BookOpen, CalendarDays, Contact, FileText, Gift, Image, LayoutDashboard,
+  Activity, Bell, BookOpen, CalendarCheck, CalendarDays, Contact, FileText, Gift, Image, LayoutDashboard,
   MenuSquare, QrCode, Search, Settings, Tags, Users, Utensils
 } from 'lucide-react'
 
@@ -13,6 +13,7 @@ export const ROLE_LABELS = {
 export const ADMIN_NAV = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['super_admin', 'admin', 'manager', 'staff'] },
   { to: '/admin/bookings', label: 'Bookings', icon: CalendarDays, roles: ['super_admin', 'admin', 'manager', 'staff'] },
+  { to: '/admin/booking-calendar', label: 'Booking Calendar', icon: CalendarCheck, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/customers', label: 'Customers', icon: Contact, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/rewards', label: 'Rewards', icon: Gift, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/rewards/scanner', label: 'Scanner', icon: QrCode, roles: ['super_admin', 'admin', 'manager', 'staff'] },
