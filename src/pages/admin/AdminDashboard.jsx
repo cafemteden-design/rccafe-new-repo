@@ -5,12 +5,13 @@ import { supabase } from '../../lib/supabaseClient.js'
 import { isGoogleSheetSyncConfigured } from '../../services/googleSheetSync.js'
 import { AdminAlert, AdminBadge, AdminPageHeader, AdminSkeleton, AdminStatCard, AdminStatSkeleton } from '../../components/admin/AdminUI.jsx'
 
-const EMPTY = { todayBookings:0,confirmedBookings:0,cancelledBookings:0,completedBookings:0,noShowBookings:0,todayRevenue:0,remoteSpotsBooked:0,rewardCards:0,stampsToday:0,rewardsRedeemed:0,newLeads:0,failedSyncs:0,systemAlerts:0 }
+const EMPTY = { todayBookings:0,pendingBookings:0,confirmedBookings:0,cancelledBookings:0,completedBookings:0,noShowBookings:0,todayRevenue:0,remoteSpotsBooked:0,rewardCards:0,stampsToday:0,rewardsRedeemed:0,newLeads:0,failedSyncs:0,systemAlerts:0 }
 const ACTIONS = [
-  ['/admin/bookings?new=1','Add Booking',CalendarCheck], ['/admin/bookings?status=confirmed','Confirmed Bookings',CalendarClock],
+  ['/admin/bookings?status=pending','Pending Bookings',CalendarCheck], ['/admin/bookings?new=1','Add Booking',CalendarCheck],
+  ['/admin/booking-calendar','Booking Calendar',CalendarClock],
   ['/admin/rewards/scanner','Open Scanner',QrCode], ['/admin/offers','Create Offer',Tags],
   ['/admin/notifications','Send Notification',Send], ['/admin/menu','Manage Menu',MenuSquare],
-  ['/admin/media','Upload Media',Image], ['/','View Website',ExternalLink]
+  ['/','View Website',ExternalLink]
 ]
 
 export default function AdminDashboard() {
@@ -43,8 +44,8 @@ export default function AdminDashboard() {
   if(loading)return <div><AdminPageHeader eyebrow="RCC Operations Command Center" title="Loading today's operations" description="Collecting live bookings, rewards, leads and system health."/><div className="mt-6"><AdminStatSkeleton count={12}/></div><div className="mt-6"><AdminSkeleton rows={5}/></div></div>
 
   const kpis=[
-    [CalendarCheck,"Today's Bookings",stats.todayBookings],[CalendarClock,'Confirmed',stats.confirmedBookings],[AlertTriangle,'Cancelled',stats.cancelledBookings],
-    [CheckCircle2,'Completed',stats.completedBookings],[Users,'No Show',stats.noShowBookings],[CircleDollarSign,'Revenue',`NZD $${Number(stats.todayRevenue||0).toFixed(0)}`],
+    [CalendarCheck,"Today's Bookings",stats.todayBookings],[CalendarClock,'Pending',stats.pendingBookings,'orange'],[CalendarClock,'Confirmed',stats.confirmedBookings,'green'],[AlertTriangle,'Cancelled',stats.cancelledBookings,'dark'],
+    [CheckCircle2,'Completed',stats.completedBookings,'green'],[Users,'No Show',stats.noShowBookings,'dark'],[CircleDollarSign,'Revenue',`NZD $${Number(stats.todayRevenue||0).toFixed(0)}`],
     [Users,'Remote Spots Booked',stats.remoteSpotsBooked],
     [QrCode,'Reward Cards',stats.rewardCards],[Gift,'Stamps Today',stats.stampsToday],[Gift,'Rewards Redeemed',stats.rewardsRedeemed],
     [Contact,'New Leads',stats.newLeads],[RefreshCw,'Failed Syncs',stats.failedSyncs],[AlertTriangle,'System Alerts',stats.systemAlerts]
@@ -54,7 +55,7 @@ export default function AdminDashboard() {
     <div className="mt-5 flex flex-wrap gap-2"><StatusPill good={!error} label={error?'Supabase Needs Attention':'Supabase Live'}/><StatusPill good={isGoogleSheetSyncConfigured()} label={isGoogleSheetSyncConfigured()?'Sheet Sync Ready':'Sheet Sync Not Configured'}/><StatusPill good={stats.systemAlerts===0} label={stats.systemAlerts===0?'No Active Alerts':`${stats.systemAlerts} Alert(s)`}/></div>
     {error&&<div className="mt-5"><AdminAlert type="error">Live dashboard data could not fully load: {error} <button onClick={load} className="ml-2 underline">Retry</button></AdminAlert></div>}
     <section className="mt-6"><Label>Quick Actions</Label><div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">{ACTIONS.map(([to,label,Icon])=><Link key={label} to={to} className="group flex min-h-24 flex-col justify-between rounded-2xl border border-border bg-white p-3 shadow-soft transition hover:-translate-y-0.5 hover:border-orange-300"><Icon size={19} className="text-orange-600"/><span className="mt-3 text-xs font-extrabold leading-tight group-hover:text-orange-700">{label}</span></Link>)}</div></section>
-    <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{kpis.map(([Icon,label,value],index)=><AdminStatCard key={label} icon={Icon} label={label} value={value} tone={index===1||index===3?'green':index===2||index===4?'dark':'orange'}/>)}</div>
+    <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{kpis.map(([Icon,label,value,tone])=><AdminStatCard key={label} icon={Icon} label={label} value={value} tone={tone||'orange'}/>)}</div>
     <div className="mt-6 grid gap-5 xl:grid-cols-2">
       <Panel title="Today's Schedule" to="/admin/bookings" rows={panels.schedule} empty="No bookings scheduled today.">{panels.schedule.map(row=><Row key={row.id} title={`${row.booking_time} | ${row.customer_name}`} detail={`${row.group_size} remotes | ${row.gameplay_duration||row.package_duration} min`} badge={row.status}/>)}</Panel>
       <Panel title="Upcoming Confirmed Bookings" to="/admin/bookings?status=confirmed" rows={panels.confirmed} empty="No upcoming confirmed bookings.">{panels.confirmed.map(row=><Row key={row.id} title={row.customer_name} detail={`${row.booking_date} ${row.booking_time} | ${row.group_size} remotes`} badge="confirmed"/>)}</Panel>
