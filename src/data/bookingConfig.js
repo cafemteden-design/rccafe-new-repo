@@ -1,4 +1,8 @@
-export const BOOKING_API_URL = "https://script.google.com/macros/s/AKfycbz2YjonaQjCAQrE_dNoa2h-7tozAI6cGGnaGxUnrJvN_fX0O66JCNBmMwp6UYcfRar32w/exec"
+// Google Sheets is an optional backup channel. Supabase remains the booking authority.
+import { BOOKING_DRINK_CHOICES } from './menu.js'
+
+export const BOOKING_API_URL = String(import.meta.env.VITE_GOOGLE_SCRIPT_URL || '').trim()
+export const BOOKING_DRINK_VALUES = BOOKING_DRINK_CHOICES
 
 export const BOOKING_CONFIG = {
   operatingDays: [0, 1, 2, 3, 4, 5, 6],
@@ -130,7 +134,7 @@ function normalizeBookingPayload(booking) {
   const phone = String(booking?.phone || booking?.customerPhone || booking?.userPhone || '').trim()
   const date = String(booking?.date || booking?.bookingDate || '').trim()
   const slotTime = String(booking?.slotTime || booking?.bookingTime || booking?.slot || booking?.time || '').trim()
-  const bookingStatus = String(booking?.bookingStatus || booking?.adminStatus || booking?.status || 'Pending Confirmation').trim()
+  const bookingStatus = String(booking?.bookingStatus || booking?.adminStatus || booking?.status || 'Confirmed').trim()
   const packageName = String(booking?.packageName || booking?.package || '').trim()
   const baseDuration = Number(booking?.baseDuration || booking?.packageDuration || 0)
   const extraDuration = Number(booking?.extraDuration || booking?.upgradeDuration || 0)
@@ -476,8 +480,9 @@ export function validateBookingData(data, runtimeConfig = BOOKING_CONFIG) {
     errors.toastieChoice = 'Please select a toastie'
   }
 
-  if (!data.coffeeChoice && !data.drinkSelection) {
-    errors.coffeeChoice = 'Please select a drink'
+  const drink = data.coffeeChoice || data.drinkSelection
+  if (!BOOKING_DRINK_VALUES.includes(drink)) {
+    errors.coffeeChoice = 'Please select a valid coffee option'
   }
 
   if (!data.confirmAttendance) {

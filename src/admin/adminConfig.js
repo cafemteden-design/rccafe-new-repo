@@ -1,6 +1,6 @@
 import {
   Activity, Bell, BookOpen, CalendarDays, Contact, FileText, Gift, Image, LayoutDashboard,
-  MenuSquare, Package, QrCode, Search, Settings, Tags, Users, Utensils
+  MenuSquare, QrCode, Search, Settings, Tags, Users, Utensils
 } from 'lucide-react'
 
 export const ROLE_LABELS = {
@@ -17,43 +17,19 @@ export const ADMIN_NAV = [
   { to: '/admin/rewards', label: 'Rewards', icon: Gift, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/rewards/scanner', label: 'Scanner', icon: QrCode, roles: ['super_admin', 'admin', 'manager', 'staff'] },
   { to: '/admin/offers', label: 'Offers', icon: Tags, roles: ['super_admin', 'admin', 'manager'] },
-  { to: '/admin/packages', label: 'Packages', icon: Package, roles: ['super_admin', 'admin', 'manager'] },
+  { to: '/admin/notifications', label: 'Notifications', icon: Bell, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/menu', label: 'Menu', icon: Utensils, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/media', label: 'Media', icon: Image, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/content', label: 'Content', icon: FileText, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/seo', label: 'SEO', icon: Search, roles: ['super_admin', 'admin', 'manager'] },
   { to: '/admin/leads', label: 'Leads', icon: BookOpen, roles: ['super_admin', 'admin', 'manager'] },
-  { to: '/admin/settings/booking', label: 'Booking Settings', icon: CalendarDays, roles: ['super_admin'] },
+  { to: '/admin/bookings/settings', label: 'Booking Settings', icon: CalendarDays, roles: ['super_admin'] },
   { to: '/admin/settings', label: 'Settings', icon: Settings, roles: ['super_admin'] },
   { to: '/admin/users', label: 'Users', icon: Users, roles: ['super_admin'] },
   { to: '/admin/diagnostics', label: 'Diagnostics', icon: Activity, roles: ['super_admin', 'admin'] }
 ]
 
 export const MODULE_CONFIG = {
-  bookings: {
-    title: 'Bookings',
-    description: 'Manage online requests, offline bookings, attendance and food preparation.',
-    table: 'bookings_mirror',
-    icon: CalendarDays,
-    roles: ['super_admin', 'admin', 'manager', 'staff'],
-    select: '*',
-    order: 'created_at',
-    search: ['booking_id', 'customer_name', 'customer_phone', 'customer_email'],
-    columns: [
-      ['customer_name', 'Customer'], ['booking_date', 'Date'], ['booking_time', 'Time'],
-      ['package_name', 'Package'], ['status', 'Status'], ['food_prepared', 'Food Ready']
-    ],
-    fields: [
-      ['booking_id', 'Booking ID', 'text'], ['customer_name', 'Customer Name', 'text'],
-      ['customer_phone', 'Phone', 'tel'], ['customer_email', 'Email', 'email'],
-      ['booking_date', 'Date', 'date'], ['booking_time', 'Time', 'text'],
-      ['package_name', 'Package', 'text'], ['package_price', 'Price', 'number'],
-      ['group_size', 'Group Size', 'number'],
-      ['status', 'Status', 'select', ['pending', 'approved', 'rejected', 'cancelled', 'completed', 'no_show']],
-      ['food_prepared', 'Food Prepared', 'checkbox'],
-      ['admin_notes', 'Admin Notes', 'textarea']
-    ]
-  },
   customers: {
     title: 'Customers', description: 'Customer directory and reward membership details.', table: 'customers',
     icon: Contact, roles: ['super_admin', 'admin', 'manager'], search: ['full_name', 'mobile', 'email'],
@@ -70,13 +46,13 @@ export const MODULE_CONFIG = {
     title: 'Offers', description: 'Create time-bound offers shown on customer reward cards.', table: 'reward_offers',
     icon: Tags, roles: ['super_admin', 'admin', 'manager'], search: ['title', 'description', 'offer_type'],
     columns: [['title', 'Offer'], ['offer_type', 'Type'], ['start_date', 'Starts'], ['end_date', 'Ends'], ['active', 'Active']],
-    fields: [['title', 'Title', 'text'], ['description', 'Description', 'textarea'], ['offer_type', 'Type', 'select', ['welcome', 'buy_one_get_one', 'free_coffee', 'weekend', 'birthday', 'general']], ['start_date', 'Start Date', 'date'], ['end_date', 'End Date', 'date'], ['image_url', 'Image URL', 'url'], ['active', 'Active', 'checkbox']]
+    fields: [['title', 'Title', 'text'], ['description', 'Message', 'textarea'], ['offer_type', 'Type', 'select', ['welcome', 'birthday', 'festival', 'buy_one_get_one', 'free_coffee', 'weekend', 'general']], ['target_audience', 'Target Audience', 'select', ['all', 'customer']], ['target_customer_email', 'Specific Customer Email', 'email'], ['start_date', 'Start Date', 'date'], ['end_date', 'End Date', 'date'], ['priority', 'Priority', 'number'], ['cta_label', 'CTA Label', 'text'], ['cta_url', 'CTA URL', 'url'], ['image_url', 'Image URL', 'url'], ['status', 'Status', 'select', ['draft', 'active', 'expired']], ['active', 'Active', 'checkbox']]
   },
-  packages: {
-    title: 'Packages', description: 'Pricing, duration and inclusions for RCC booking packages. Note: the public Menu reflects these live, but the Booking page calculation currently uses static fallback for safety (slugs mini/power/master must stay unchanged).', table: 'packages',
-    icon: Package, roles: ['super_admin', 'admin', 'manager'], search: ['name', 'description'],
-    columns: [['name', 'Package'], ['duration_minutes', 'Duration'], ['price', 'Price'], ['is_popular', 'Popular'], ['active', 'Active']],
-    fields: [['name', 'Name', 'text'], ['slug', 'Slug', 'text'], ['description', 'Description', 'textarea'], ['duration_minutes', 'Duration Minutes', 'number'], ['price', 'Price', 'number'], ['image_url', 'Image URL', 'url'], ['badge', 'Badge', 'text'], ['is_popular', 'Most Popular', 'checkbox'], ['active', 'Active', 'checkbox'], ['sort_order', 'Sort Order', 'number']]
+  notifications: {
+    title: 'Reward Notifications', description: 'Publish festival, birthday, customer-specific or all-customer messages.', table: 'reward_notifications',
+    icon: Bell, roles: ['super_admin', 'admin', 'manager'], search: ['title', 'message', 'notification_type', 'audience'],
+    columns: [['title', 'Title'], ['notification_type', 'Type'], ['audience', 'Audience'], ['starts_at', 'Starts'], ['active', 'Active']],
+    fields: [['title', 'Title', 'text'], ['message', 'Message', 'textarea'], ['notification_type', 'Type', 'select', ['general', 'festival', 'birthday', 'offer', 'customer']], ['audience', 'Audience', 'select', ['all', 'customer']], ['target_customer_email', 'Specific Customer Email', 'email'], ['starts_at', 'Starts At', 'datetime-local'], ['ends_at', 'Ends At', 'datetime-local'], ['priority', 'Priority', 'number'], ['cta_label', 'CTA Label', 'text'], ['cta_url', 'CTA URL', 'url'], ['status', 'Status', 'select', ['draft', 'active', 'expired']], ['active', 'Active', 'checkbox']]
   },
   menu: {
     title: 'Menu', description: 'Food and drink catalogue, categories, prices and availability.', table: 'menu_items',

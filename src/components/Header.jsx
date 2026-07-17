@@ -132,7 +132,7 @@ export default function Header() {
                       }`
                     }
                   >
-                    {item.label}
+                    {item.to === '/rewards' ? 'My Reward Card' : item.label}
                     <ChevronRight size={19} className="flex-shrink-0 text-orange-500" />
                   </NavLink>
                 ))}

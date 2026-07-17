@@ -6,7 +6,7 @@ export const SITE = {
   phone: '',
   phoneTel: '',
   location: '159 Mount Eden Road, Mount Eden, Auckland 1024',
-  hours: 'We Are Open Every Day!',
+  hours: 'Open every day with day-specific hours.',
   address: {
     street: '159 Mount Eden Road',
     suburb: 'Mount Eden',
@@ -32,7 +32,7 @@ export const SITE = {
 
 export const NAV = [
   { to: '/', label: 'Home' },
-  { to: '/rewards', label: 'Rewards' },
+  { to: '/rewards', label: 'My Rewards' },
   { to: '/booking', label: 'Booking' },
   { to: '/menu', label: 'Menu' },
   { to: '/experience', label: 'Experience' },

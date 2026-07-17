@@ -45,6 +45,33 @@ export default function AdminModulePage({ moduleKey }) {
   }, [rows, query, config])
 
   const submit = async (values, file) => {
+    if (moduleKey === 'notifications' && !editing?.id) {
+      const { error } = await supabase.rpc('create_reward_notification', {
+        p_title: values.title, p_message: values.message, p_type: values.notification_type || 'general',
+        p_audience: values.audience || 'all', p_customer_email: values.target_customer_email || null,
+        p_starts_at: values.starts_at || null, p_ends_at: values.ends_at || null,
+        p_priority: Number(values.priority || 1), p_cta_label: values.cta_label || null, p_cta_url: values.cta_url || null
+      })
+      if (error) return toast.error(error.message)
+      setEditing(null)
+      toast.success('Reward notification published.')
+      load()
+      return
+    }
+    if (moduleKey === 'notifications' && editing?.id) {
+      let targetId = null
+      if (values.audience === 'customer') {
+        const { data: target, error: targetError } = await supabase.from('reward_cards').select('id').ilike('email', String(values.target_customer_email || '').trim()).eq('active', true).maybeSingle()
+        if (targetError || !target) return toast.error(targetError?.message || 'Customer reward card not found.')
+        targetId = target.id
+      }
+      const { error } = await supabase.from('reward_notifications').update({ ...values, target_reward_card_id: targetId }).eq('id', editing.id)
+      if (error) return toast.error(error.message)
+      setEditing(null)
+      toast.success('Reward notification updated.')
+      load()
+      return
+    }
     let payload = values
     if (moduleKey === 'media' && file) {
       const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, '-')

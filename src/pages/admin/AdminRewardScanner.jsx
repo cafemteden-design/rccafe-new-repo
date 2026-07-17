@@ -3,6 +3,7 @@ import { BadgeCheck, Gift, PartyPopper, QrCode, ScanLine, Search, Stamp, Undo2 }
 import { supabase } from '../../lib/supabaseClient.js'
 import { AdminAlert, AdminEmpty, AdminModal, AdminPageHeader } from '../../components/admin/AdminUI.jsx'
 import { useToast } from '../../components/admin/ToastContext.jsx'
+import { rewardToSheetPayload, syncGoogleSheet } from '../../services/googleSheetSync.js'
 
 export default function AdminRewardScanner() {
   const toast = useToast()
@@ -30,15 +31,18 @@ export default function AdminRewardScanner() {
       token = ''
     }
     const normalized = value.toUpperCase().replace(/[\s-]/g, '')
-    const query = token
-      ? supabase.from('reward_cards').select('*').eq('secure_token', token)
-      : supabase.from('reward_cards').select('*').eq('rcc_card_id', normalized)
+    let query = supabase.from('reward_cards').select('*')
+    if (token) query = query.eq('secure_token', token)
+    else if (value.includes('@')) query = query.ilike('email', value.toLowerCase())
+    else if (/^RCC/i.test(normalized)) query = query.eq('rcc_card_id', normalized)
+    else query = query.eq('mobile', value)
     const { data, error } = await query.maybeSingle()
     if (error || !data) {
       setCard(null)
       setMessage({ type: 'error', text: error?.message || 'Reward card not found.' })
     } else {
-      setCard(data)
+      const { data: latestEvent } = await supabase.from('reward_events').select('event_type,created_at,note').eq('reward_card_id', data.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      setCard({ ...data, last_activity: latestEvent || null })
       setCardId(data.rcc_card_id)
       setMessage({ type: 'success', text: `${data.rcc_card_id} loaded securely.` })
     }
@@ -48,7 +52,7 @@ export default function AdminRewardScanner() {
     event?.preventDefault()
     setMessage(null)
     if (!cardId.trim()) {
-      setMessage({ type: 'error', text: 'Enter or scan an RCC Card ID.' })
+      setMessage({ type: 'error', text: 'Enter a Card Number, email or phone.' })
       return
     }
     setWorking(true)
@@ -90,11 +94,12 @@ export default function AdminRewardScanner() {
     setScanning(false)
   }
 
-  const addStamp = async () => {
+  const addStamp = async (countOverride) => {
+    const count = Number(countOverride || stampCount) || 1
     setWorking(true)
     const { data, error } = await supabase.rpc('add_reward_stamp', {
       p_reward_card_id: card.id,
-      p_stamp_count: Number(stampCount) || 1,
+      p_stamp_count: count,
       p_note: note.trim() || 'Added from admin scanner'
     })
     if (error) toast.error(error.message)
@@ -102,7 +107,8 @@ export default function AdminRewardScanner() {
       setCard((current) => ({ ...current, ...data }))
       setNote('')
       setStampCount(1)
-      toast.success(data.reward_status === 'unlocked' ? 'Reward target reached. Gift unlocked!' : `${Number(stampCount) || 1} stamp(s) added.`)
+      toast.success(data.reward_status === 'unlocked' ? 'Reward target reached. Gift unlocked!' : `${count} stamp(s) added.`)
+      syncGoogleSheet('rewardStampAdded', rewardToSheetPayload(data, { stamp_count: count, notes: note.trim() })).catch(() => {})
     }
     setWorking(false)
   }
@@ -119,6 +125,7 @@ export default function AdminRewardScanner() {
       setCard((current) => ({ ...current, ...data }))
       setNote('')
       toast.success('Last stamp removed.')
+      syncGoogleSheet('rewardStampRemoved', rewardToSheetPayload(data, { notes: note.trim() })).catch(() => {})
     }
     setWorking(false)
   }
@@ -134,6 +141,7 @@ export default function AdminRewardScanner() {
       setCard((current) => ({ ...current, ...data }))
       setNote('')
       toast.success('Reward redeemed and a new cycle started.')
+      syncGoogleSheet('rewardRedeemed', rewardToSheetPayload(data, { notes: note.trim() })).catch(() => {})
     }
     setWorking(false)
   }
@@ -149,13 +157,14 @@ export default function AdminRewardScanner() {
       setCard((current) => ({ ...current, ...data }))
       setNote('')
       toast.success('Welcome gift redeemed.')
+      syncGoogleSheet('welcomeGiftRedeemed', rewardToSheetPayload(data, { notes: note.trim() })).catch(() => {})
     }
     setWorking(false)
   }
 
   return (
     <div>
-      <AdminPageHeader eyebrow="Staff Tool" title="Reward Scanner" description="Scan a customer QR or enter their RCC Card ID to add stamps and redeem gifts." />
+      <AdminPageHeader eyebrow="Staff Tool" title="Reward Scanner" description="Scan a customer QR or find a card by Card Number, email or phone." />
       <div className="mt-6 grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
         <section className="rounded-2xl border border-border bg-white p-5 shadow-soft">
           <div className="rounded-2xl border border-dashed border-orange-300 bg-orange-50 p-5 text-center">
@@ -168,9 +177,9 @@ export default function AdminRewardScanner() {
             </button>
           </div>
           <form onSubmit={findCard} className="mt-5">
-            <label className="field-label">RCC Card ID</label>
+            <label className="field-label">Card Number, Email or Phone</label>
             <div className="mt-1.5 flex gap-2">
-              <input value={cardId} onChange={(event) => setCardId(event.target.value)} className="field-input !mt-0 uppercase" placeholder="RCC1001" />
+              <input value={cardId} onChange={(event) => setCardId(event.target.value)} className="field-input !mt-0" placeholder="RCC1001, email or mobile" />
               <button disabled={working} className="grid h-11 w-12 flex-shrink-0 place-items-center rounded-xl bg-charcoal-300 text-white disabled:opacity-50" aria-label="Find reward card"><Search size={18} /></button>
             </div>
           </form>
@@ -198,6 +207,7 @@ export default function AdminRewardScanner() {
             <div className="mt-5 rounded-xl bg-bg-soft p-4">
               <div className="text-xs font-bold uppercase tracking-widest text-muted">Progress</div>
               <div className="mt-1 font-display text-3xl font-extrabold">{card.current_stamps}/7</div>
+              <div className="mt-2 text-xs text-muted">Last activity: {card.last_activity ? `${String(card.last_activity.event_type).replaceAll('_', ' ')} | ${new Date(card.last_activity.created_at).toLocaleString('en-NZ')}` : 'No activity yet'}</div>
             </div>
             {card.welcome_gift_unlocked && !card.welcome_gift_redeemed && (
               <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 p-3">
@@ -217,7 +227,8 @@ export default function AdminRewardScanner() {
               </label>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <button type="button" disabled={working || card.reward_status === 'unlocked'} onClick={addStamp} className="btn-primary min-h-12 disabled:opacity-50"><Stamp size={17} />Add Stamp{Number(stampCount) > 1 ? `s (${stampCount})` : ''}</button>
+              <button type="button" disabled={working || card.reward_status === 'unlocked'} onClick={() => addStamp(1)} className="btn-primary min-h-12 disabled:opacity-50"><Stamp size={17} />Add 1 Stamp</button>
+              <button type="button" disabled={working || card.reward_status === 'unlocked'} onClick={() => addStamp()} className="btn-outline min-h-12 disabled:opacity-50"><Stamp size={17} />Add Multiple ({stampCount})</button>
               <button type="button" disabled={working || card.reward_status !== 'unlocked'} onClick={redeem} className="btn-outline min-h-12 disabled:opacity-50"><Gift size={17} />Redeem Gift</button>
             </div>
             <button type="button" disabled={working || card.current_stamps <= 0} onClick={() => setConfirmRemove(true)} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-red-200 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:opacity-40"><Undo2 size={16} />Remove Last Stamp</button>

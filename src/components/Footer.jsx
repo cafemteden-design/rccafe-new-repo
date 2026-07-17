@@ -3,6 +3,7 @@ import { Instagram, Facebook, Youtube, Mail, MapPin, Clock, Gift } from 'lucide-
 import { SITE, NAV } from '../data/site.js'
 import Logo from './Logo.jsx'
 import { trackBookNowClick } from '../hooks/useAnalytics.js'
+import { usePublicSiteSettings } from '../hooks/usePublicSiteSettings.js'
 
 const SEO_LINKS = [
   { to: '/kids-activities-auckland', label: 'Kids Activities Auckland' },
@@ -24,6 +25,7 @@ function TikTokIcon(props) {
 }
 
 export default function Footer() {
+  const { settings } = usePublicSiteSettings()
   return (
     <footer className="relative overflow-hidden border-t border-orange-100 bg-[#fffaf3] text-charcoal-300">
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-500 via-charcoal-300 to-orange-400" />
@@ -39,10 +41,10 @@ export default function Footer() {
             construction fun for families, kids and groups in Auckland.
           </p>
           <div className="mt-5 flex items-center gap-3">
-            <a href={SITE.socials.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><Instagram size={18} /></a>
-            <a href={SITE.socials.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><Facebook size={18} /></a>
-            <a href={SITE.socials.tiktok} target="_blank" rel="noreferrer" aria-label="TikTok" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><TikTokIcon className="h-[18px] w-[18px]" /></a>
-            <a href={SITE.socials.youtube} target="_blank" rel="noreferrer" aria-label="YouTube" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><Youtube size={18} /></a>
+            {settings.socials.instagram && <a href={settings.socials.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><Instagram size={18} /></a>}
+            {settings.socials.facebook && <a href={settings.socials.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><Facebook size={18} /></a>}
+            {settings.socials.tiktok && <a href={settings.socials.tiktok} target="_blank" rel="noreferrer" aria-label="TikTok" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><TikTokIcon className="h-[18px] w-[18px]" /></a>}
+            {settings.socials.youtube && <a href={settings.socials.youtube} target="_blank" rel="noreferrer" aria-label="YouTube" className="rounded-full border border-border bg-white p-2.5 text-charcoal-100 transition hover:border-orange-500 hover:text-orange-600"><Youtube size={18} /></a>}
           </div>
         </div>
 
@@ -77,7 +79,7 @@ export default function Footer() {
           <ul className="mt-4 space-y-3 text-sm">
             <li className="flex items-start gap-3 text-charcoal-100"><Mail size={18} className="mt-0.5 text-orange-600" /><a href={`mailto:${SITE.email}`} className="transition hover:text-orange-600">Send Enquiry</a></li>
             <li className="flex items-start gap-3 text-charcoal-100"><MapPin size={18} className="mt-0.5 text-orange-600" /><a href={SITE.googleBusiness} target="_blank" rel="noreferrer" className="transition hover:text-orange-600">{SITE.location}</a></li>
-            <li className="flex items-start gap-3 text-charcoal-100"><Clock size={18} className="mt-0.5 text-orange-600" /> {SITE.hours}</li>
+            <li className="flex items-start gap-3 text-charcoal-100"><Clock size={18} className="mt-0.5 text-orange-600" /> {settings.openingHighlight}</li>
           </ul>
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <Link to="/booking#calendar" className="btn-primary min-h-12 whitespace-nowrap px-4 text-center" onClick={() => trackBookNowClick({ location: 'footer' })}>Book Your Session</Link>

@@ -18,11 +18,18 @@ export default function useInstallPrompt() {
   }, [])
 
   const requestInstall = async () => {
+    // Browsers require a customer gesture and confirmation; unsupported browsers get clear manual instructions.
     if (promptEvent) {
-      await promptEvent.prompt()
-      await promptEvent.userChoice
-      setPromptEvent(null)
-      return
+      try {
+        await promptEvent.prompt()
+        await promptEvent.userChoice
+        setPromptEvent(null)
+        return
+      } catch {
+        setPromptEvent(null)
+        setShowGuide(true)
+        return
+      }
     }
     setShowGuide(true)
   }

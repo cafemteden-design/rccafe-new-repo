@@ -3,6 +3,7 @@ import { useEffect, lazy, Suspense } from 'react'
 import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
 import Loader from './components/Loader.jsx'
+import SmoothScroll from './components/SmoothScroll.jsx'
 import Analytics from './components/Analytics.jsx'
 import SEO from './components/SEO.jsx'
 import Home from './pages/Home.jsx'
@@ -41,6 +42,7 @@ const AdminRewardsManager = lazy(() => import('./pages/admin/AdminRewardsManager
 const AdminDiagnostics = lazy(() => import('./pages/admin/AdminDiagnostics.jsx'))
 const AdminBookingSettings = lazy(() => import('./pages/admin/AdminBookingSettings.jsx'))
 const AdminBookingsV2 = lazy(() => import('./pages/admin/AdminBookingsV2.jsx'))
+const AdminSiteSettings = lazy(() => import('./pages/admin/AdminSiteSettings.jsx'))
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -68,6 +70,7 @@ export default function App() {
       <Analytics />
       {!isAdmin && <Loader />}
       <ScrollToTop />
+      <SmoothScroll />
       {!isAdmin && <Header />}
       <main className={isAdmin ? '' : 'pt-24'}>
         <Suspense fallback={<div className="min-h-[60vh]" />}>
@@ -107,14 +110,16 @@ export default function App() {
             <Route path="rewards" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminRewardsManager /></ProtectedAdminRoute>} />
             <Route path="rewards/scanner" element={<AdminRewardScanner />} />
             <Route path="offers" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="offers" /></ProtectedAdminRoute>} />
-            <Route path="packages" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="packages" /></ProtectedAdminRoute>} />
+            <Route path="notifications" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="notifications" /></ProtectedAdminRoute>} />
+            <Route path="packages" element={<Navigate to="/admin/bookings/settings" replace />} />
             <Route path="menu" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="menu" /></ProtectedAdminRoute>} />
             <Route path="media" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="media" /></ProtectedAdminRoute>} />
             <Route path="content" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="content" /></ProtectedAdminRoute>} />
             <Route path="seo" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="seo" /></ProtectedAdminRoute>} />
             <Route path="leads" element={<ProtectedAdminRoute roles={['super_admin', 'admin', 'manager']}><AdminModulePage moduleKey="leads" /></ProtectedAdminRoute>} />
-            <Route path="settings/booking" element={<ProtectedAdminRoute roles={['super_admin']}><AdminBookingSettings /></ProtectedAdminRoute>} />
-            <Route path="settings" element={<ProtectedAdminRoute roles={['super_admin']}><AdminModulePage moduleKey="settings" /></ProtectedAdminRoute>} />
+            <Route path="bookings/settings" element={<ProtectedAdminRoute roles={['super_admin']}><AdminBookingSettings /></ProtectedAdminRoute>} />
+            <Route path="settings/booking" element={<Navigate to="/admin/bookings/settings" replace />} />
+            <Route path="settings" element={<ProtectedAdminRoute roles={['super_admin']}><AdminSiteSettings /></ProtectedAdminRoute>} />
             <Route path="users" element={<ProtectedAdminRoute roles={['super_admin']}><AdminModulePage moduleKey="users" /></ProtectedAdminRoute>} />
             <Route path="diagnostics" element={<ProtectedAdminRoute roles={['super_admin', 'admin']}><AdminDiagnostics /></ProtectedAdminRoute>} />
           </Route>

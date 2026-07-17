@@ -5,6 +5,7 @@ import SEO from '../components/SEO.jsx'
 import { SITE } from '../data/site.js'
 import { PAGE_SEO, breadcrumbSchema } from '../data/seo.js'
 import { trackEmailClick, trackContactSubmission } from '../hooks/useAnalytics.js'
+import { usePublicSiteSettings } from '../hooks/usePublicSiteSettings.js'
 
 function TikTokIcon(props) {
   return (
@@ -15,6 +16,7 @@ function TikTokIcon(props) {
 }
 
 export default function Contact() {
+  const { settings } = usePublicSiteSettings()
   const [form, setForm] = useState({ name: '', email: '', enquiryType: 'General Enquiry', message: '' })
   const [sent, setSent] = useState(false)
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
@@ -45,15 +47,15 @@ export default function Contact() {
             <div className="grid gap-4">
               <InfoCard icon={Mail} title="Email Us" value="Send Enquiry" href={`mailto:${SITE.email}`} onClick={() => trackEmailClick({ location: 'contact_page' })} />
               <InfoCard icon={MapPin} title="Visit Us" value={SITE.location} href={SITE.googleBusiness} />
-              <InfoCard icon={Clock} title="Opening Hours" value={SITE.hours} />
+              <OpeningHoursCard settings={settings} />
             </div>
             <div className="mt-6 card p-5">
               <h3 className="font-display text-xl font-extrabold text-charcoal-300">Follow Remote Control Cafe</h3>
               <div className="mt-4 flex gap-3">
-                <Social href={SITE.socials.instagram} label="Instagram" icon={Instagram} />
-                <Social href={SITE.socials.facebook} label="Facebook" icon={Facebook} />
-                <Social href={SITE.socials.tiktok} label="TikTok" icon={TikTokIcon} />
-                <Social href={SITE.socials.youtube} label="YouTube" icon={Youtube} />
+                {settings.socials.instagram && <Social href={settings.socials.instagram} label="Instagram" icon={Instagram} />}
+                {settings.socials.facebook && <Social href={settings.socials.facebook} label="Facebook" icon={Facebook} />}
+                {settings.socials.tiktok && <Social href={settings.socials.tiktok} label="TikTok" icon={TikTokIcon} />}
+                {settings.socials.youtube && <Social href={settings.socials.youtube} label="YouTube" icon={Youtube} />}
               </div>
             </div>
           </div>
@@ -106,6 +108,15 @@ function InfoCard({ icon: Icon, title, value, href, onClick }) {
 
   if (href) return <a href={href} onClick={onClick} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined}>{content}</a>
   return content
+}
+
+function OpeningHoursCard({ settings }) {
+  const rows = Object.entries(settings.openingHours || {}).filter(([, hours]) => String(hours || '').trim())
+  return <div className="rounded-2xl border border-border bg-white p-5 shadow-soft">
+    <div className="flex items-start gap-4"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-600"><Clock size={20} /></div><div><div className="text-xs font-bold uppercase tracking-widest text-muted">Opening Hours</div><div className="mt-1 font-semibold text-charcoal-300">{settings.openingHighlight}</div></div></div>
+    {rows.length > 0 && <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">{rows.map(([day, hours]) => <div key={day} className="flex justify-between gap-4"><dt className="font-bold capitalize">{day}</dt><dd className="text-right text-muted">{hours}</dd></div>)}</dl>}
+    {settings.googleHoursUrl && <a href={settings.googleHoursUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-10 items-center text-sm font-extrabold text-orange-700 hover:text-orange-600">View current hours on Google</a>}
+  </div>
 }
 
 function Social({ href, label, icon: Icon }) {

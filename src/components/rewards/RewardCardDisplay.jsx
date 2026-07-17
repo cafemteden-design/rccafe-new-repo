@@ -18,7 +18,7 @@ export default function RewardCardDisplay({ card, cardUrl, compact = false }) {
   )
 }
 
-export function RewardCardFront({ card, compact = false }) {
+export function RewardCardFront({ card, cardUrl, compact = false, showQr = false }) {
   const status = getRewardStatus(card)
   const count = Math.min(Number(card.stampCount || 0), STAMP_TOTAL)
 
@@ -59,9 +59,12 @@ export function RewardCardFront({ card, compact = false }) {
         )}
       </div>
       {!compact && (
-        <div className="relative mt-3 rounded-2xl border border-orange-100 bg-white px-3 py-2 text-xs">
-          <span className="font-bold text-muted">Mobile</span>
-          <span className="ml-2 font-extrabold text-charcoal-300">{card.phone || 'Not provided'}</span>
+        <div className={`relative mt-3 grid gap-3 ${showQr ? 'grid-cols-[minmax(0,1fr)_88px]' : ''}`}>
+          <div className="min-w-0 space-y-2 rounded-2xl border border-orange-100 bg-white px-3 py-2 text-xs">
+            <div className="min-w-0"><span className="font-bold text-muted">Mobile</span><span className="ml-2 break-words font-extrabold text-charcoal-300">{card.phone || 'Not provided'}</span></div>
+            {card.email && <div className="min-w-0"><span className="font-bold text-muted">Email</span><span className="ml-2 break-all font-extrabold text-charcoal-300">{card.email}</span></div>}
+          </div>
+          {showQr && <div className="w-[88px]"><DemoQrCode value={cardUrl || card.token || card.cardId} label="Card QR" premium compact /></div>}
         </div>
       )}
 

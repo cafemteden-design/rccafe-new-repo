@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/validate-build.js",
+    "test:admin-v3": "node scripts/test-final-admin-v3.mjs",
+    "test:sql": "node scripts/validate-supabase-sql.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "framer-motion": "^11.3.0",
     "html5-qrcode": "^2.3.8",
+    "lenis": "^1.3.23",
     "lucide-react": "^0.460.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",

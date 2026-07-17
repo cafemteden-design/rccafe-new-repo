@@ -2,13 +2,15 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, BadgeCheck, Calendar, Check, Coffee, Gift, Mail, PartyPopper, QrCode, Sparkles, Truck, Users } from 'lucide-react'
-import Logo from '../components/Logo.jsx'
+import { ArrowRight, BadgeCheck, Calendar, Clock3, Coffee, Facebook, Gift, Instagram, Mail, PartyPopper, Sparkles, Truck, Users } from 'lucide-react'
 import SEO from '../components/SEO.jsx'
+import AnnouncementStrip from '../components/AnnouncementStrip.jsx'
 import { SITE } from '../data/site.js'
 import { PAGE_SEO } from '../data/seo.js'
 import { trackBookNowClick } from '../hooks/useAnalytics.js'
 import { useCmsContent } from '../hooks/useCmsContent.js'
+import { usePublicSiteSettings } from '../hooks/usePublicSiteSettings.js'
+import { BUSINESS_HOURS_ROWS } from '../data/businessHours.js'
 
 const HERO_SUBTITLE = "Remote Control Café is New Zealand's most unique café experience, combining great coffee, tasty food, and exciting remote-control fun for all ages."
 const HERO_BADGES = ['Real RC Machines', 'Café & Snacks', 'Family Friendly', 'Birthday Friendly']
@@ -30,10 +32,13 @@ const EVENTS = [
 
 export default function Home() {
   const cms = useCmsContent('home')
+  const { settings: siteSettings } = usePublicSiteSettings()
   return (
     <>
       <SEO {...PAGE_SEO['/']} path="/" />
-      <HeroSection cms={cms} />
+      <AnnouncementStrip />
+      <HeroSection cms={cms} siteSettings={siteSettings} />
+      <OpeningHoursStrip settings={siteSettings} />
       <IntroSection cms={cms} />
       <ExperienceHighlights />
       <PackagesSection />
@@ -45,7 +50,11 @@ export default function Home() {
   )
 }
 
-function HeroSection({ cms }) {
+function OpeningHoursStrip({ settings }) {
+  return <section className="border-b border-orange-100 bg-[#fffaf3] py-6 sm:py-8"><div className="container-x"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white"><Clock3 size={20} /></span><div><div className="text-[10px] font-extrabold uppercase tracking-widest text-orange-700">Official Opening Hours</div><h2 className="mt-1 font-display text-xl font-extrabold text-charcoal-300">Open every day</h2></div></div><div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-4xl lg:grid-cols-7">{BUSINESS_HOURS_ROWS.map(([key, label]) => <div key={key} className="rounded-xl border border-orange-100 bg-white px-3 py-2 text-center shadow-sm"><div className="text-[10px] font-extrabold uppercase tracking-wider text-muted">{label.slice(0, 3)}</div><div className="mt-1 text-[11px] font-bold leading-tight text-charcoal-300">{settings.openingHours[key]}</div></div>)}</div></div></div></section>
+}
+
+function HeroSection({ cms, siteSettings }) {
   const videoRef = useRef(null)
   const heroTitle = cms.field('hero', 'title', 'Drive. Dig. Build. Play.')
   const heroSubtitle = cms.field('hero', 'subtitle', HERO_SUBTITLE)
@@ -142,6 +151,15 @@ function HeroSection({ cms }) {
               </span>
             ))}
           </motion.div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.34 }} className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/25 px-3 py-2 text-xs font-bold text-white backdrop-blur">
+            <Clock3 size={15} className="text-orange-300" />{siteSettings.openingHighlight}
+          </motion.div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.4 }} className="mt-5 flex items-center gap-2.5">
+            <span className="mr-1 text-[10px] font-extrabold uppercase tracking-widest text-white/65">Follow RCC</span>
+            {siteSettings.socials.instagram && <SocialLink href={siteSettings.socials.instagram} label="Instagram"><Instagram size={16} /></SocialLink>}
+            {siteSettings.socials.facebook && <SocialLink href={siteSettings.socials.facebook} label="Facebook"><Facebook size={16} /></SocialLink>}
+            {siteSettings.socials.tiktok && <SocialLink href={siteSettings.socials.tiktok} label="TikTok"><TikTokIcon className="h-4 w-4" /></SocialLink>}
+          </motion.div>
         </div>
       </div>
     </section>
@@ -237,68 +255,38 @@ function PackagesSection() {
 }
 
 function RewardsSection({ cms }) {
-  const title = cms.field('rewards', 'title', 'Create Your Free Reward Card')
-  const body = cms.field('rewards', 'body', 'Sign up for your digital reward card and unlock a welcome surprise after creating your card.')
+  const title = cms.field('rewards', 'title', 'My Rewards')
+  const body = cms.field('rewards', 'body', 'Create your digital RCC card, collect stamps and unlock surprise rewards.')
   return (
-    <section className="section-soft relative overflow-hidden py-12 sm:py-16">
-      <div className="absolute -left-28 bottom-0 h-64 w-64 rounded-full bg-orange-100/70 blur-3xl" />
-      <div className="container-x grid gap-7 lg:grid-cols-12 lg:items-center">
-        <Reveal className="lg:col-span-6">
-          <span className="eyebrow"><Gift size={14} />RCC Reward Card</span>
-          <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300 sm:text-4xl">{title}</h2>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">
-            {body}
-          </p>
-          <div className="mt-5 grid gap-2 text-sm text-charcoal-300 sm:grid-cols-2">
-            {['Free digital card', 'Save your card link', 'Staff scans your QR', 'Collect stamps anytime'].map((item) => (
-              <div key={item} className="flex items-center gap-2"><BadgeCheck size={16} className="text-green-600" /> {item}</div>
-            ))}
+    <section className="section-soft py-10 sm:py-12">
+      <div className="container-x">
+        <Reveal className="rounded-3xl border border-orange-200 bg-white p-5 shadow-card sm:p-7">
+          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <span className="eyebrow"><Gift size={14} />Reward Card</span>
+              <h2 className="mt-3 font-display text-3xl font-extrabold text-charcoal-300">{title}</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{body}</p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {['Reward Card', 'Collect Stamps', 'Unlock Surprises'].map((item, index) => <div key={item} className="flex items-center gap-2 text-sm font-bold text-charcoal-300"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-orange-100 text-xs text-orange-700">{index + 1}</span>{item}</div>)}
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+              <Link to="/rewards#create-card" className="btn-primary min-h-12">Create Card <ArrowRight size={16} /></Link>
+              <Link to="/rewards#card-login" className="btn-outline min-h-12">Open My Card</Link>
+            </div>
           </div>
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <Link to="/rewards" className="btn-primary">Create My Reward Card <ArrowRight size={16} /></Link>
-            <Link to="/rewards" className="btn-outline">See How It Works</Link>
-          </div>
-        </Reveal>
-        <Reveal className="lg:col-span-6" delay={0.08}>
-          <RewardPreviewCard />
         </Reveal>
       </div>
     </section>
   )
 }
 
-function RewardPreviewCard() {
-  return (
-    <div className="relative mx-auto max-w-md overflow-hidden rounded-[28px] border border-orange-200 bg-white p-5 shadow-card transition duration-300 hover:-translate-y-1 hover:shadow-glow">
-      <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-orange-500 via-charcoal-300 to-orange-400" />
-      <div className="flex items-start justify-between gap-4">
-        <Logo className="h-14 w-auto max-w-[150px]" />
-        <span className="rounded-full bg-orange-500 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-white">Active Card</span>
-      </div>
-      <div className="mt-5 grid grid-cols-[1fr_auto] items-end gap-4">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-muted">Digital Reward Card</div>
-          <h3 className="mt-1 font-display text-2xl font-extrabold text-charcoal-300">RCC Guest</h3>
-          <p className="mt-1 text-sm font-semibold text-orange-700">Card ID: RCC1001</p>
-        </div>
-        <div className="grid h-16 w-16 place-items-center rounded-2xl border border-orange-200 bg-[#fff8ee] text-center">
-          <QrCode size={24} className="text-charcoal-300" />
-          <span className="-mt-3 text-[8px] font-extrabold uppercase tracking-wider text-orange-700">Scan</span>
-        </div>
-      </div>
-      <div className="mt-5 flex gap-1.5">
-        {Array.from({ length: 7 }).map((_, index) => (
-          <span key={index} className={`grid h-8 w-8 place-items-center rounded-full border text-[10px] font-extrabold ${index < 3 ? 'border-orange-500 bg-orange-500 text-white' : index === 6 ? 'border-orange-300 bg-orange-50 text-orange-700' : 'border-orange-100 bg-white text-muted'}`}>
-            {index === 6 ? 'G' : index < 3 ? <Check size={13} strokeWidth={3} /> : index + 1}
-          </span>
-        ))}
-      </div>
-      <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-[#fff8ee] p-4 text-sm font-semibold text-charcoal-300">
-        <span>Create your card to reveal your welcome surprise.</span>
-        <span className="shrink-0 font-extrabold text-orange-700">3/7</span>
-      </div>
-    </div>
-  )
+function SocialLink({ href, label, children }) {
+  return <a href={href} target="_blank" rel="noreferrer" aria-label={label} title={label} className="grid h-10 w-10 place-items-center rounded-full border border-white/25 bg-black/20 text-white backdrop-blur transition hover:border-white/60 hover:bg-white hover:text-charcoal-300">{children}</a>
+}
+
+function TikTokIcon(props) {
+  return <svg viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M19.6 6.7a5.7 5.7 0 0 1-3.4-1.1V15a5.5 5.5 0 1 1-5.5-5.5c.3 0 .6 0 .9.1V12a3 3 0 1 0 2.1 2.9V2h2.5a5.5 5.5 0 0 0 3.4 4.7Z" /></svg>
 }
 
 const MOMENT_IMAGES = [

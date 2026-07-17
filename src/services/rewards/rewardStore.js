@@ -73,8 +73,28 @@ export function authenticateRewardCard(cardId, dob) {
   return card.dobHash === createDobFingerprint(dob) ? card : null
 }
 
+export function authenticateRewardCardByEmail(email, dob) {
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail || !dob) return null
+  const card = getRewardCards().find((item) => normalizeEmail(item.email) === normalizedEmail)
+  if (!card || card.requiresPasswordReset) return null
+  return card.dobHash === createDobFingerprint(dob) ? card : null
+}
+
+export function findRewardIdentityDuplicate({ email, phone }) {
+  const normalizedEmail = normalizeEmail(email)
+  const normalizedPhone = normalizePhone(phone)
+  const cards = getRewardCards()
+  if (normalizedEmail && cards.some((card) => normalizeEmail(card.email) === normalizedEmail)) return 'email'
+  if (normalizedPhone && cards.some((card) => normalizePhone(card.phone) === normalizedPhone)) return 'mobile'
+  return ''
+}
+
 export function createRewardCard({ name, phone, dob, email = '' }) {
   const cards = getStoredCards()
+  const duplicate = findRewardIdentityDuplicate({ email, phone })
+  if (duplicate === 'email') throw new Error('A reward card already exists for this email address. Please open your existing card.')
+  if (duplicate === 'mobile') throw new Error('A reward card already exists for this mobile number. Please open your existing card.')
   const highestExistingNumber = cards.reduce((highest, card) => {
     const match = normalizeCardId(card.cardId).match(/^RCC(\d+)$/)
     return Math.max(highest, match ? Number(match[1]) : 0)
@@ -339,6 +359,14 @@ function saveRewardProgram(program) {
 
 function normalizeCardId(value) {
   return String(value || '').trim().toUpperCase().replace(/[\s-]+/g, '')
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '')
 }
 
 function createDobFingerprint(value) {

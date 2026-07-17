@@ -22,6 +22,11 @@ html, body {
   scroll-behavior: smooth;
 }
 
+html.lenis,
+html.lenis body {
+  scroll-behavior: auto !important;
+}
+
 * { box-sizing: border-box; }
 
 ::selection { background: var(--orange); color: #fff; }
@@ -42,6 +47,9 @@ html, body {
   }
   .btn-dark {
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-charcoal-300 px-6 py-3 text-sm font-bold text-white transition-all duration-300 hover:bg-charcoal-100;
+  }
+  .reward-action {
+    @apply inline-flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-xl border border-orange-100 bg-white px-3 py-3 text-center text-xs font-extrabold leading-tight text-charcoal-300 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-300 hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-400/30;
   }
 
   .heading-display {
@@ -117,5 +125,6 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html, body { scroll-behavior: auto !important; }
   .moment-track { animation: none; }
 }

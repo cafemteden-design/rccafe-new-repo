@@ -27,6 +27,9 @@ export const EXPECTED_TABLES = [
   'customers',
   'activity_logs',
   'settings'
+  ,'booking_settings'
+  ,'booking_slot_capacity'
+  ,'reward_notification_reads'
 ]
 
 // RPCs that are safe to probe without mutating data.
@@ -39,10 +42,26 @@ const READONLY_RPCS = [
   {
     name: 'login_reward_card',
     args: { p_rcc_card_id: '__diagnostic_probe__', p_date_of_birth: '1900-01-01' }
+  },
+  {
+    name: 'login_reward_card_by_email',
+    args: { p_email: 'diagnostic.invalid@example.com', p_date_of_birth: '1900-01-01' }
+  },
+  {
+    name: 'check_reward_identity',
+    args: { p_email: 'diagnostic.invalid@example.com', p_mobile: '0000000' }
+  },
+  {
+    name: 'get_admin_dashboard_stats',
+    args: {}
+  },
+  {
+    name: 'get_slot_availability_v3',
+    args: { p_booking_date: '2099-01-01', p_booking_time: '09:00 AM' }
   }
 ]
 
-const MUTATING_RPCS = ['register_reward_card', 'add_reward_stamp', 'undo_last_reward_stamp', 'redeem_reward', 'redeem_welcome_gift']
+const MUTATING_RPCS = ['create_booking_request_v3', 'create_booking_request_v4', 'set_booking_status', 'cancel_confirmed_booking', 'create_reward_notification', 'register_reward_card', 'add_reward_stamp', 'undo_last_reward_stamp', 'redeem_reward', 'redeem_welcome_gift']
 
 /**
  * Calls the read-only admin_access_diagnostics() RPC to report the caller's real
