@@ -41,11 +41,13 @@ CREATE TABLE IF NOT EXISTS booking_date_overrides (
 
 ALTER TABLE booking_date_overrides ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Public can read date overrides"
+DROP POLICY IF EXISTS "Public can read date overrides" ON booking_date_overrides;
+CREATE POLICY "Public can read date overrides"
   ON booking_date_overrides FOR SELECT TO anon, authenticated
   USING (true);
 
-CREATE POLICY IF NOT EXISTS "Staff can manage date overrides"
+DROP POLICY IF EXISTS "Staff can manage date overrides" ON booking_date_overrides;
+CREATE POLICY "Staff can manage date overrides"
   ON booking_date_overrides FOR ALL TO authenticated
   USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'manager') AND active = true)
@@ -66,11 +68,13 @@ CREATE TABLE IF NOT EXISTS booking_slot_overrides (
 
 ALTER TABLE booking_slot_overrides ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Public can read slot overrides"
+DROP POLICY IF EXISTS "Public can read slot overrides" ON booking_slot_overrides;
+CREATE POLICY "Public can read slot overrides"
   ON booking_slot_overrides FOR SELECT TO anon, authenticated
   USING (true);
 
-CREATE POLICY IF NOT EXISTS "Staff can manage slot overrides"
+DROP POLICY IF EXISTS "Staff can manage slot overrides" ON booking_slot_overrides;
+CREATE POLICY "Staff can manage slot overrides"
   ON booking_slot_overrides FOR ALL TO authenticated
   USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'manager') AND active = true)
