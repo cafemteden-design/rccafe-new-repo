@@ -1,10 +1,10 @@
 import { supabase } from '../lib/supabaseClient.js'
 import { BOOKING_DRINK_CHOICES } from '../data/menu.js'
 
-export const BOOKING_STATUSES = ['confirmed', 'cancelled', 'completed', 'no_show']
+export const BOOKING_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed', 'no_show']
 export const BOOKING_DRINK_VALUES = BOOKING_DRINK_CHOICES
 
-export async function createConfirmedBooking(booking) {
+export async function createPendingBooking(booking) {
   if (!supabase) throw new Error('Live booking service is not configured.')
   const duration = Number(booking.packageDuration || booking.baseDuration || booking.durationMinutes)
   const drinkSelection = booking.drinkSelection || booking.coffeeChoice || null
@@ -39,6 +39,29 @@ export async function createConfirmedBooking(booking) {
   return data
 }
 
+export const createConfirmedBooking = createPendingBooking
+
+export async function approveBooking(bookingId) {
+  if (!supabase) throw new Error('Live booking service is not configured.')
+  const { data, error } = await supabase.rpc('set_booking_status', {
+    p_booking_id: bookingId,
+    p_status: 'confirmed'
+  })
+  if (error) throw error
+  return data
+}
+
+export async function rejectBooking(bookingId, reason = '', note = '') {
+  if (!supabase) throw new Error('Live booking service is not configured.')
+  const { data, error } = await supabase.rpc('reject_booking', {
+    p_booking_id: bookingId,
+    p_rejection_reason: reason || null,
+    p_admin_note: note || null
+  })
+  if (error) throw error
+  return data
+}
+
 export async function updateBookingStatus(bookingId, status, note = '') {
   if (!supabase) throw new Error('Live booking service is not configured.')
   const normalized = String(status || '').trim().toLowerCase()
@@ -58,6 +81,27 @@ export async function cancelBooking(bookingId, reason = '') {
     p_booking_id: bookingId,
     p_cancellation_reason: reason || null
   })
+  if (error) throw error
+  return data
+}
+
+export async function markConfirmationEmailSent(bookingId) {
+  if (!supabase) return false
+  const { data, error } = await supabase.rpc('mark_confirmation_email_sent', { p_booking_id: bookingId })
+  if (error) throw error
+  return data
+}
+
+export async function markRejectionEmailSent(bookingId) {
+  if (!supabase) return false
+  const { data, error } = await supabase.rpc('mark_rejection_email_sent', { p_booking_id: bookingId })
+  if (error) throw error
+  return data
+}
+
+export async function fetchDateAvailability(dateKey) {
+  if (!supabase) return null
+  const { data, error } = await supabase.rpc('get_date_availability', { p_date: dateKey })
   if (error) throw error
   return data
 }

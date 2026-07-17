@@ -14,7 +14,7 @@ import { BUSINESS_HOURS_ROWS, businessHoursSnapshot, formatBusinessHours, genera
 import { useBookingSettings } from '../hooks/useBookingSettings.js'
 import { trackBookingSubmission } from '../hooks/useAnalytics.js'
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient.js'
-import { createConfirmedBooking, fetchConfirmedSlotUsage, subscribeToSlotCapacity } from '../services/bookingV2.js'
+import { createPendingBooking, fetchConfirmedSlotUsage, fetchDateAvailability, subscribeToSlotCapacity } from '../services/bookingV2.js'
 import { bookingToSheetPayload, syncGoogleSheet } from '../services/googleSheetSync.js'
 
 const STEPS = ['Date', 'Time', 'Remotes', 'Gameplay', 'Food', 'Details', 'Summary']
@@ -35,6 +35,7 @@ export default function Booking() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
   const [availabilityError, setAvailabilityError] = useState('')
   const [availabilityVersion, setAvailabilityVersion] = useState(0)
+  const [dateClosures, setDateClosures] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(null)
   const [errors, setErrors] = useState({})
@@ -59,7 +60,7 @@ export default function Booking() {
   const totalPrice = duration ? data.remotes * duration.price : 0
   const availableDates = useMemo(() => createAvailableDates(settings), [settings])
   const baseSlots = useMemo(() => data.date ? generateHourlySlots(data.date, settings.businessHours) : [], [data.date, settings.businessHours])
-  const slots = useMemo(() => slotsWithAvailability(baseSlots, availability, maxCapacity), [baseSlots, availability, maxCapacity])
+  const slots = useMemo(() => slotsWithAvailability(baseSlots, availability, maxCapacity, dateClosures), [baseSlots, availability, maxCapacity, dateClosures])
   const selectedSlot = data.slotIndex === null ? null : slots[data.slotIndex] || null
 
   useEffect(() => {
@@ -75,11 +76,26 @@ export default function Booking() {
       try {
         const dateKey = formatDateKey(data.date)
         if (!isSupabaseConfigured) throw new Error('Supabase booking service is not configured.')
-        const rows = await fetchConfirmedSlotUsage(dateKey)
-        if (active) setAvailability(Object.fromEntries(rows.map((row) => [normalizeStart(row.slot_time), Number(row.approved_spots || 0)])))
+        const [rows, dateAvail] = await Promise.all([
+          fetchConfirmedSlotUsage(dateKey),
+          fetchDateAvailability(dateKey).catch(() => null)
+        ])
+        if (active) {
+          setAvailability(Object.fromEntries(rows.map((row) => [normalizeStart(row.slot_time), Number(row.approved_spots || 0)])))
+          if (dateAvail) {
+            const closures = { dayClosed: dateAvail.day_closed, dayReason: dateAvail.day_closure_reason, slots: {} }
+            for (const slot of (dateAvail.slots || [])) {
+              if (slot.manually_closed) closures.slots[normalizeStart(slot.slot_time)] = slot.closure_reason || 'Closed'
+            }
+            setDateClosures(closures)
+          } else {
+            setDateClosures({})
+          }
+        }
       } catch {
         if (active) {
           setAvailability({})
+          setDateClosures({})
           setAvailabilityError('Live availability is temporarily unavailable. Slots are shown with fallback capacity. Please try again or contact RCC if the issue continues.')
         }
       } finally {
@@ -220,8 +236,8 @@ export default function Booking() {
       customerPhone: data.customerPhone.trim(),
       phone: data.customerPhone.trim(),
       notes: data.notes.trim(),
-      status: 'confirmed',
-      bookingStatus: 'confirmed',
+      status: 'pending',
+      bookingStatus: 'pending',
       source: 'website-v4'
     }
 
@@ -229,7 +245,7 @@ export default function Booking() {
     setErrors({})
     try {
       const bookingId = generateBookingReference(payload.bookingDate)
-      const confirmedPayload = {
+      const bookingPayload = {
         ...payload,
         booking_id: bookingId,
         bookingId,
@@ -242,21 +258,20 @@ export default function Booking() {
         gameplay_duration: payload.duration_minutes,
         price_per_remote: payload.price_per_remote,
         total_price: payload.totalPrice,
-        source: 'website-v4-apps-script-primary',
-        status: 'confirmed'
+        source: 'website-v4-supabase-primary',
+        status: 'pending'
       }
 
-      const syncResult = await syncGoogleSheet('bookingCreated', bookingToSheetPayload(confirmedPayload))
-      if (!syncResult.success) throw new Error(syncResult.message || 'Google Apps Script booking failed.')
+      if (!isSupabaseConfigured) throw new Error('Booking service is not configured. Please contact RCC.')
 
-      if (isSupabaseConfigured) {
-        void withTimeout(createConfirmedBooking(confirmedPayload), 10000, 'Supabase booking timed out.').then((confirmedResult) => {
-          const confirmed = Array.isArray(confirmedResult) ? confirmedResult[0] : confirmedResult
-          if (confirmed?.id) void recordPublicSheetSync(confirmed, syncResult)
-        }).catch((supabaseError) => {
-          if (import.meta.env.DEV) console.warn('[booking] Apps Script confirmed booking, Supabase will need to catch up:', supabaseError.message)
+      const supabaseResult = await createPendingBooking(bookingPayload)
+      const created = Array.isArray(supabaseResult) ? supabaseResult[0] : supabaseResult
+
+      void syncGoogleSheet('bookingCreated', bookingToSheetPayload({ ...bookingPayload, id: created?.id }))
+        .then((syncResult) => {
+          if (created?.id) void recordPublicSheetSync(created, syncResult)
         })
-      }
+        .catch(() => {})
 
       trackBookingSubmission({
         booking_date: payload.bookingDate,
@@ -314,7 +329,7 @@ export default function Booking() {
                 {step < 6 ? (
                   <button type="button" onClick={next} disabled={step <= 3 || submitting} className={`btn-primary min-h-12 ${step <= 3 ? 'invisible' : ''}`}>Continue <ArrowRight size={16} /></button>
                 ) : (
-                  <button type="button" onClick={submit} disabled={submitting || capacityReduced || !data.termsAccepted} className="btn-primary min-h-12 disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <><RefreshCw className="animate-spin" size={17} />Submitting...</> : <><Send size={17} />Confirm Booking</>}</button>
+                  <button type="button" onClick={submit} disabled={submitting || capacityReduced || !data.termsAccepted} className="btn-primary min-h-12 disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <><RefreshCw className="animate-spin" size={17} />Submitting...</> : <><Send size={17} />Submit Booking Request</>}</button>
                 )}
               </div>
             </main>
@@ -387,8 +402,9 @@ function SlotStep({ slots, loading, error, onSelect, retry }) {
           return (
             <button key={slot.startTime} type="button" disabled={full} onClick={() => onSelect(slot)} className={`min-h-28 min-w-0 rounded-2xl border p-3 text-left transition sm:p-4 ${full ? 'cursor-not-allowed border-red-200 bg-red-50/70 opacity-70' : 'border-border bg-white hover:-translate-y-0.5 hover:border-orange-400 hover:shadow-soft'}`}>
               <div className="min-w-0"><div className="font-display text-sm font-extrabold leading-snug text-charcoal-300 sm:text-lg">{slot.label}</div><div className="mt-1 hidden text-xs font-semibold text-muted sm:block">Fixed 1-hour booking slot</div></div>
-              <span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider sm:text-[10px] ${full ? 'bg-red-100 text-red-700' : slot.remaining <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{full ? 'Fully Booked' : `${slot.remaining} left`}</span>
-              {full && <p className="mt-3 text-xs leading-relaxed text-red-700">All 8 remotes are already reserved for this hour.</p>}
+              <span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider sm:text-[10px] ${full ? 'bg-red-100 text-red-700' : slot.remaining <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{slot.closed ? 'Unavailable' : full ? 'Fully Booked' : `${slot.remaining} left`}</span>
+              {slot.closed && <p className="mt-3 text-xs leading-relaxed text-red-700">This slot is currently unavailable.</p>}
+              {full && !slot.closed && <p className="mt-3 text-xs leading-relaxed text-red-700">All 8 remotes are already reserved for this hour.</p>}
             </button>
           )
         })}
@@ -474,7 +490,7 @@ function FoodStep({ data, update, errors }) {
 function DetailsStep({ data, update, errors, remaining, onEditRemotes, onOpenRemoteEditor }) {
   return (
     <div>
-      <StepHeading icon={User} title="Customer Details" text="We will use these details for your confirmed booking." />
+      <StepHeading icon={User} title="Customer Details" text="We will use these details for your booking request." />
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <Field label="Full Name" icon={User} value={data.customerName} onChange={(value) => update({ customerName: value })} error={errors.name} />
         <Field label="Email" icon={Mail} type="email" value={data.customerEmail} onChange={(value) => update({ customerEmail: value })} error={errors.email} />
@@ -507,11 +523,11 @@ function ReviewStep({ data, slot, duration, totalPrice, update, error, termsErro
       </div>
       <FoodBreakdown selections={data.foodSelections} className="mt-5" />
       <ul className="mt-5 space-y-2 border-t border-border pt-4 text-xs leading-relaxed text-muted">
-        <li>Your booking is confirmed immediately after successful submission.</li><li>Please arrive on time for your selected session.</li><li>Extra gameplay time can be arranged in-store depending on availability.</li><li>To request a cancellation, reply to your confirmation email or contact RCC Cafe with your booking reference, name, date and time.</li><li>Cancellation requests should be submitted at least 30 minutes before the scheduled booking time.</li>
+        <li>Your booking request will be reviewed and confirmed by the RCC team.</li><li>Your requested time slot will be held while your booking is pending.</li><li>You will receive an email once your booking is approved.</li><li>Please arrive on time for your selected session.</li><li>Extra gameplay time can be arranged in-store depending on availability.</li><li>To request a cancellation, contact RCC Cafe with your booking reference, name, date and time.</li>
       </ul>
       <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${termsError ? 'border-red-300 bg-red-50' : 'border-orange-200 bg-orange-50'}`}>
         <input type="checkbox" checked={data.termsAccepted} onChange={(event) => update({ termsAccepted: event.target.checked })} className="mt-0.5 h-5 w-5 shrink-0 accent-orange-500" />
-        <span className="text-sm font-bold leading-relaxed text-charcoal-300">I confirm my booking details are correct and understand this booking will be confirmed immediately.</span>
+        <span className="text-sm font-bold leading-relaxed text-charcoal-300">I confirm my booking details are correct and understand this booking is subject to approval by the RCC team.</span>
       </label>
       {termsError && <ErrorText>{termsError}</ErrorText>}
     </section>
@@ -540,7 +556,7 @@ function BookingSummary({ data, slot, duration, totalPrice, inline = false, coll
         <FoodBreakdown selections={data.foodSelections} compact />
         <div className="mt-5 flex items-end justify-between border-t border-border pt-4"><span className="text-xs font-extrabold uppercase tracking-widest text-muted">Total</span><span className="font-display text-3xl font-extrabold text-orange-600">${totalPrice}</span></div>
         {duration && data.remotes > 0 && <div className="mt-1 text-right text-xs text-muted">{data.remotes} x ${duration.price} per remote</div>}
-        <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-3 text-xs leading-relaxed text-charcoal-300"><strong>Status: Confirmed</strong><br />Your slot is confirmed once this booking is saved successfully.</div>
+        <div className="mt-5 rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs leading-relaxed text-charcoal-300"><strong>Status: Pending Approval</strong><br />Your requested slot will be held after submission and confirmed by the RCC team.</div>
         <p className="mt-4 text-xs leading-relaxed text-muted">{ADD_ON_COPY}</p>
         <div className="mt-4 border-t border-border pt-4"><p className="text-xs leading-relaxed text-muted">{ENQUIRY_COPY}</p><Link to="/contact" className="btn-outline mt-3 min-h-12 w-full">Send Enquiry</Link></div>
       </div>}
@@ -571,7 +587,7 @@ function EnquiryNote() {
 }
 
 function SuccessView({ booking, onReset }) {
-  return <section className="bg-[#fffdfa] py-12 sm:py-16"><SEO {...PAGE_SEO['/booking']} path="/booking" /><div className="container-x"><div className="mx-auto max-w-2xl rounded-3xl border border-green-200 bg-white p-6 shadow-card sm:p-8"><div className="text-center"><div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-green-100 text-green-700"><CheckCircle2 size={28} /></div><h1 className="mt-5 font-display text-3xl font-extrabold">Booking Confirmed</h1><p className="mt-3 text-sm leading-relaxed text-muted">Your booking has been confirmed successfully.</p></div><div className="mt-6 rounded-2xl border border-border bg-bg-soft p-4"><SuccessRow label="Booking Reference" value={booking.bookingId} /><SuccessRow label="Name" value={booking.customerName} /><SuccessRow label="Date" value={booking.date ? formatDateDisplay(new Date(`${booking.date}T12:00:00`)) : '-'} /><SuccessRow label="Time" value={booking.slot_label || booking.slotTime} /><SuccessRow label="Guests" value={booking.remoteSpots} /><SuccessRow label="Gameplay" value={booking.playTime} /><SuccessRow label="Status" value="Confirmed" /><SuccessRow label="Total" value={`NZD $${booking.totalPrice}`} /><FoodBreakdown selections={booking.perRemoteSelections} className="mt-4" /></div><div className="mt-5 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-relaxed text-charcoal-300"><p>To request a cancellation, please reply to your confirmation email or contact Remote Control Cafe with your booking reference, name, booking date and booking time. Cancellation requests should be submitted at least 30 minutes before the scheduled booking time.</p><p className="mt-2 font-bold">Your booking remains confirmed until you receive a cancellation confirmation from our team.</p></div><div className="mt-6 grid gap-3 sm:grid-cols-2"><Link to="/" className="btn-outline">Back to Home</Link><button type="button" onClick={onReset} className="btn-primary">Make Another Booking</button></div></div></div></section>
+  return <section className="bg-[#fffdfa] py-12 sm:py-16"><SEO {...PAGE_SEO['/booking']} path="/booking" /><div className="container-x"><div className="mx-auto max-w-2xl rounded-3xl border border-orange-200 bg-white p-6 shadow-card sm:p-8"><div className="text-center"><div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-orange-100 text-orange-700"><Clock3 size={28} /></div><h1 className="mt-5 font-display text-3xl font-extrabold">Booking Request Received</h1><p className="mt-3 text-sm leading-relaxed text-muted">Your booking request has been received and is awaiting confirmation from the RCC team.</p></div><div className="mt-6 rounded-2xl border border-border bg-bg-soft p-4"><SuccessRow label="Booking Reference" value={booking.bookingId} /><SuccessRow label="Name" value={booking.customerName} /><SuccessRow label="Date" value={booking.date ? formatDateDisplay(new Date(`${booking.date}T12:00:00`)) : '-'} /><SuccessRow label="Time" value={booking.slot_label || booking.slotTime} /><SuccessRow label="Guests" value={booking.remoteSpots} /><SuccessRow label="Gameplay" value={booking.playTime} /><SuccessRow label="Status" value="Pending Approval" /><SuccessRow label="Total" value={`NZD $${booking.totalPrice}`} /><FoodBreakdown selections={booking.perRemoteSelections} className="mt-4" /></div><div className="mt-5 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-relaxed text-charcoal-300"><p>You will receive an email after your booking is approved by the RCC team. Your requested time slot is being held for you.</p><p className="mt-2">To request a cancellation, please contact Remote Control Cafe with your booking reference, name, booking date and booking time.</p></div><div className="mt-6 grid gap-3 sm:grid-cols-2"><Link to="/" className="btn-outline">Back to Home</Link><button type="button" onClick={onReset} className="btn-primary">Make Another Booking</button></div></div></div></section>
 }
 
 function SuccessRow({ label, value }) { return <div className="flex items-start justify-between gap-4 border-b border-white py-2 text-sm last:border-0"><span className="text-muted">{label}</span><strong className="text-right">{value || '-'}</strong></div> }
@@ -643,10 +659,14 @@ async function recordPublicSheetSync(booking, result) {
   }
 }
 
-function slotsWithAvailability(baseSlots, usage, capacity) {
+function slotsWithAvailability(baseSlots, usage, capacity, closures = {}) {
+  if (closures.dayClosed) return baseSlots.map((slot) => ({ ...slot, used: capacity, remaining: 0, closed: true, closedReason: closures.dayReason || 'Day closed' }))
   return baseSlots.map((slot) => {
-    const used = Math.max(Number(usage[normalizeStart(slot.startTime)] || 0), 0)
-    return { ...slot, used, remaining: Math.max(capacity - used, 0) }
+    const key = normalizeStart(slot.startTime)
+    const closedReason = closures.slots?.[key]
+    if (closedReason) return { ...slot, used: capacity, remaining: 0, closed: true, closedReason }
+    const used = Math.max(Number(usage[key] || 0), 0)
+    return { ...slot, used, remaining: Math.max(capacity - used, 0), closed: false }
   })
 }
 
