@@ -574,9 +574,19 @@ END;
 $$;
 
 -- ============================================================
--- 12. Tighten record_booking_sheet_sync_v3 to authenticated only
+-- 12. Tighten record_booking_sheet_sync_v3 to authenticated only (skip if not present)
 -- ============================================================
-REVOKE EXECUTE ON FUNCTION record_booking_sheet_sync_v3(uuid, text, boolean, text) FROM anon;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'record_booking_sheet_sync_v3'
+  ) THEN
+    EXECUTE 'REVOKE EXECUTE ON FUNCTION record_booking_sheet_sync_v3(uuid, text, boolean, text) FROM anon';
+  END IF;
+END;
+$$;
 
 -- ============================================================
 -- 13. Grant execute on new functions
