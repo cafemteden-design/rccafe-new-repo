@@ -28,7 +28,8 @@ export function mergeBusinessHours(value = {}) {
 }
 
 export function hoursForDate(date, businessHours = OFFICIAL_BUSINESS_HOURS) {
-  const key = DAY_KEYS[date?.getDay?.()]
+  const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : date
+  const key = DAY_KEYS[d?.getDay?.()]
   return key ? mergeBusinessHours(businessHours)[key] : null
 }
 
@@ -49,8 +50,9 @@ export function generateHourlySlots(date, businessHours = OFFICIAL_BUSINESS_HOUR
 }
 
 export function businessHoursSnapshot(date, businessHours = OFFICIAL_BUSINESS_HOURS) {
-  const hours = hoursForDate(date, businessHours)
-  const dayKey = DAY_KEYS[date?.getDay?.()]
+  const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : date
+  const hours = hoursForDate(d, businessHours)
+  const dayKey = DAY_KEYS[d?.getDay?.()]
   return {
     day: dayKey ? `${dayKey[0].toUpperCase()}${dayKey.slice(1)}` : '',
     open: hours?.open || '',
