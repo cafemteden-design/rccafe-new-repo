@@ -38,7 +38,8 @@ export default function Home() {
       <SEO {...PAGE_SEO['/']} path="/" />
       <AnnouncementStrip />
       <HeroSection cms={cms} siteSettings={siteSettings} />
-      <OpeningHoursStrip settings={siteSettings} />
+<SummerComingSoonPoster />
+<OpeningHoursStrip settings={siteSettings} />
       <IntroSection cms={cms} />
       <ExperienceHighlights />
       <PackagesSection />
@@ -47,6 +48,33 @@ export default function Home() {
       <EventsSection cms={cms} />
       <HomeEnquiryForm cms={cms} />
     </>
+  )
+}
+
+function SummerComingSoonPoster() {
+  return (
+    <section className="bg-white py-5 sm:py-7">
+      <div className="container-x">
+        <div className="mx-auto max-w-5xl rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-widest text-orange-600">
+                ☀️ SUMMER AT REMOTE CONTROL CAFÉ
+              </p>
+              <h2 className="mt-2 font-display text-2xl font-extrabold text-charcoal-300">
+                Something Exciting Is Coming!
+              </h2>
+              <p className="mt-2 text-sm text-charcoal-300">
+                New Summer Menu + Exciting RC Updates
+              </p>
+            </div>
+            <span className="w-fit rounded-full bg-orange-500 px-4 py-2 text-xs font-extrabold text-white">
+              COMING SOON
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 
